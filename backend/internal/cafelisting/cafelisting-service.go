@@ -1,6 +1,9 @@
 package cafelisting
 
-import "github.com/khorzhenwin/go-cafe/backend/internal/models"
+import (
+	"github.com/khorzhenwin/go-cafe/backend/internal/models"
+	"gorm.io/gorm"
+)
 
 type Service struct {
 	store Storage
@@ -35,8 +38,11 @@ func (s *Service) UpdateListing(id uint, userID uint, updated models.CafeListing
 
 func (s *Service) DeleteListing(id uint, userID uint) error {
 	existing, err := s.store.GetByID(id)
-	if err != nil || existing == nil {
+	if err != nil {
 		return err
+	}
+	if existing == nil {
+		return gorm.ErrRecordNotFound
 	}
 	if existing.UserID != userID {
 		return ErrNotOwner

@@ -1,7 +1,6 @@
 package cafelisting
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/khorzhenwin/go-cafe/backend/internal/models"

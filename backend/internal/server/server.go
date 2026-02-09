@@ -8,7 +8,6 @@ import (
 	"github.com/khorzhenwin/go-cafe/backend/internal/auth"
 	"github.com/khorzhenwin/go-cafe/backend/internal/cafelisting"
 	appconfig "github.com/khorzhenwin/go-cafe/backend/internal/config"
-	"github.com/khorzhenwin/go-cafe/backend/internal/db"
 	"github.com/khorzhenwin/go-cafe/backend/internal/rating"
 	"github.com/khorzhenwin/go-cafe/backend/internal/user"
 	"gorm.io/gorm"
