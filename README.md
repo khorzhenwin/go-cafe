@@ -23,7 +23,7 @@ When updating:
 ```text
 go-cafe/
   backend/    # Go API server, migrations, tests, Docker assets
-  frontend/   # Frontend app (currently empty / planned)
+  frontend/   # Next.js frontend app (Vercel-ready)
 ```
 
 ## Current architecture
@@ -49,14 +49,21 @@ Flow:
 2. `internal/server` wires repositories, services, handlers, and routes.
 3. Protected routes use JWT middleware and user ID from request context.
 
-### Frontend (planned)
+### Frontend (implemented)
 
-`frontend/` currently has no committed application code. When frontend implementation starts, keep this README updated with:
-
-- Framework/runtime.
-- Route map and page-level responsibilities.
-- State and API client patterns.
-- Deployment/build requirements.
+- Framework/runtime: Next.js (App Router), React
+- Deployment target: Vercel
+- Current app scope:
+  - Signup/login experience
+  - Create, edit, delete, and sort cafe listings
+  - Create, edit, and delete cafe reviews
+  - Listing cards enriched with average rating and review count
+- API client location: `frontend/lib/api.js`
+- Proxy route to backend API: `frontend/app/api/backend/[...path]/route.js`
+- Environment files:
+  - `frontend/.env`
+  - `frontend/.env.example`
+  - `frontend/.env.exmaple` (kept for compatibility with requested filename)
 
 ## Backend-Frontend contract
 
@@ -68,6 +75,7 @@ Auth:
 - Frontend should send `Authorization: Bearer <token>` for protected endpoints.
 - Protected endpoints return `401` when token is missing/invalid.
 - User-scoped endpoints can return `403` when authenticated user does not own the resource.
+- Frontend reads backend base URL from `NEXT_PUBLIC_API_BASE_URL`.
 
 ### Auth endpoints
 
@@ -171,6 +179,18 @@ Backend reads env vars from `backend/.env` (via `godotenv`):
 
 Reference template: `backend/.env.example`
 
+Frontend env vars (`frontend/.env`):
+
+- `API_BASE_URL` (required for Next.js server-side proxy route)
+  - Local backend via Docker: `http://localhost:8080`
+  - Production backend: `https://<your-backend-domain>`
+- `NEXT_PUBLIC_API_BASE_URL` (optional fallback)
+
+Vercel setup:
+
+- Add `API_BASE_URL` in Project Settings -> Environment Variables.
+- Use the same value for Preview/Production (or separate values per environment).
+
 ## Local development
 
 From repository root:
@@ -179,6 +199,8 @@ From repository root:
 make -C backend help
 make -C backend migrate-up
 make -C backend run
+cd frontend && npm install
+cd frontend && npm run dev
 ```
 
 Common backend targets:
@@ -190,6 +212,12 @@ Common backend targets:
 - `make -C backend docker-up`
 - `make -C backend docker-down`
 - `make -C backend auth` (prints JWT token)
+
+Common frontend commands:
+
+- `cd frontend && npm run dev`
+- `cd frontend && npm run build`
+- `cd frontend && npm run start`
 
 ## Compact backend API verification checklist
 
@@ -247,3 +275,4 @@ For any PR that changes behavior across backend/frontend:
 
 - `2026-02-16`: Created the initial live requirements README with architecture, API contract, DB schema, environment variables, and maintenance protocol.
 - `2026-02-16`: Added compact backend API verification checklist and `make auth` usage to standardize pre-frontend backend validation.
+- `2026-02-16`: Reworked frontend into a product-style flow (signup/login, listings CRUD + sorting, review CRUD) and switched API calls through a Next.js proxy route for Vercel compatibility.
