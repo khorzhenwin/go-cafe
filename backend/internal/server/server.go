@@ -10,6 +10,7 @@ import (
 	appconfig "github.com/khorzhenwin/go-cafe/backend/internal/config"
 	"github.com/khorzhenwin/go-cafe/backend/internal/rating"
 	"github.com/khorzhenwin/go-cafe/backend/internal/user"
+	httpSwagger "github.com/swaggo/http-swagger"
 	"gorm.io/gorm"
 )
 
@@ -34,6 +35,7 @@ func New(dbConn *gorm.DB, authCfg *appconfig.AuthConfig, srvCfg Config) http.Han
 	authHandler := &auth.Handler{AuthCfg: authCfg, Finder: userSvc, Creator: userSvc}
 
 	r := chi.NewRouter()
+	r.Get("/swagger/*", httpSwagger.WrapHandler)
 	r.Route(srvCfg.BasePath, func(r chi.Router) {
 		auth.RegisterRoutes(r, authHandler)
 		user.RegisterRoutes(r, userSvc)

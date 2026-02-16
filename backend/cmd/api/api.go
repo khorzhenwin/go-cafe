@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"github.com/joho/godotenv"
+	_ "github.com/khorzhenwin/go-cafe/backend/docs"
 	appconfig "github.com/khorzhenwin/go-cafe/backend/internal/config"
 	"github.com/khorzhenwin/go-cafe/backend/internal/db"
 	"github.com/khorzhenwin/go-cafe/backend/internal/server"

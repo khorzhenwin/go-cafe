@@ -1,0 +1,8 @@
+basePath: /api/v1
+info:
+  contact: {}
+  description: API for users, cafe listings, and ratings.
+  title: go-cafe backend API
+  version: "1.0"
+paths: {}
+swagger: "2.0"

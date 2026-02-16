@@ -5,6 +5,11 @@ import (
 	"time"
 )
 
+// @title go-cafe backend API
+// @version 1.0
+// @description API for users, cafe listings, and ratings.
+// @BasePath /api/v1
+
 type application struct {
 	config config
 }

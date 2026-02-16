@@ -2,7 +2,11 @@ version: "3.9"
 
 services:
   go-cafe-backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        GENERATE_SWAGGER: "true"
     ports:
       - "8080:8080"
     env_file:

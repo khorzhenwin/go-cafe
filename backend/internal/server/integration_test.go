@@ -10,7 +10,10 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"testing"
+	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
@@ -55,9 +58,10 @@ func TestIntegration_RegisterLoginAndCafeFlow(t *testing.T) {
 	handler := New(conn, authCfg, cfg)
 
 	base := "/api/v1"
+	testEmail := "inttest+" + strconv.FormatInt(time.Now().UnixNano(), 10) + "@example.com"
 
 	// 1. Register
-	regBody := map[string]string{"email": "inttest@example.com", "name": "Int Test", "password": "secret123"}
+	regBody := map[string]string{"email": testEmail, "name": "Int Test", "password": "secret123"}
 	regJSON, _ := json.Marshal(regBody)
 	req := httptest.NewRequest(http.MethodPost, base+"/auth/register", bytes.NewReader(regJSON))
 	req.Header.Set("Content-Type", "application/json")
@@ -73,7 +77,7 @@ func TestIntegration_RegisterLoginAndCafeFlow(t *testing.T) {
 	token := regResp.Token
 
 	// 2. Login
-	loginBody := map[string]string{"email": "inttest@example.com", "password": "secret123"}
+	loginBody := map[string]string{"email": testEmail, "password": "secret123"}
 	loginJSON, _ := json.Marshal(loginBody)
 	req = httptest.NewRequest(http.MethodPost, base+"/auth/login", bytes.NewReader(loginJSON))
 	req.Header.Set("Content-Type", "application/json")
@@ -105,9 +109,17 @@ func TestIntegration_RegisterLoginAndCafeFlow(t *testing.T) {
 }
 
 func init() {
-	// Load .env from backend root when running tests from repo root
+	// Try common working-directory locations first.
 	_ = godotenv.Load()
 	_ = godotenv.Load(".env")
+
+	// Resolve backend root from this test file path so loading works
+	// no matter where `go test` is executed from.
+	if _, file, _, ok := runtime.Caller(0); ok {
+		backendRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
+		_ = godotenv.Load(filepath.Join(backendRoot, ".env"))
+	}
+
 	if os.Getenv("DB_HOST") == "" {
 		_ = godotenv.Load("backend/.env")
 	}

@@ -1,0 +1,11 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for users, cafe listings, and ratings.",
+        "title": "go-cafe backend API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {}
+}
