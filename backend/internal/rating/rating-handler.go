@@ -44,6 +44,17 @@ func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Han
 	})
 }
 
+// GetByIDHandler godoc
+// @Summary Get rating by ID
+// @Description Returns a rating by ID.
+// @Tags ratings
+// @Produce json
+// @Param id path int true "Rating ID"
+// @Success 200 {object} models.Rating
+// @Failure 400 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /ratings/{id} [get]
 func (h *Handler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -64,6 +75,16 @@ func (h *Handler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(rating)
 }
 
+// ListByCafeHandler godoc
+// @Summary List ratings by cafe
+// @Description Returns ratings for a cafe listing.
+// @Tags ratings
+// @Produce json
+// @Param id path int true "Cafe ID"
+// @Success 200 {array} models.Rating
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /cafes/{id}/ratings/ [get]
 func (h *Handler) ListByCafeHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	cafeID, err := strconv.Atoi(idStr)
@@ -80,6 +101,16 @@ func (h *Handler) ListByCafeHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(ratings)
 }
 
+// ListMyHandler godoc
+// @Summary List my ratings
+// @Description Returns ratings created by the authenticated user.
+// @Tags ratings
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} models.Rating
+// @Failure 401 {string} string
+// @Failure 500 {string} string
+// @Router /me/ratings [get]
 func (h *Handler) ListMyHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -95,6 +126,19 @@ func (h *Handler) ListMyHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(ratings)
 }
 
+// ListByUserHandler godoc
+// @Summary List ratings by user
+// @Description Returns ratings for a user path parameter; must match authenticated user.
+// @Tags ratings
+// @Produce json
+// @Security BearerAuth
+// @Param userId path int true "User ID"
+// @Success 200 {array} models.Rating
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 500 {string} string
+// @Router /users/{userId}/ratings/ [get]
 func (h *Handler) ListByUserHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -120,6 +164,20 @@ func (h *Handler) ListByUserHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(ratings)
 }
 
+// CreateHandler godoc
+// @Summary Create rating
+// @Description Creates a rating for a cafe listing.
+// @Tags ratings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Cafe ID"
+// @Param body body models.Rating true "Create rating payload"
+// @Success 201 {object} models.Rating
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 500 {string} string
+// @Router /cafes/{id}/ratings/ [post]
 func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -148,6 +206,22 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(rating)
 }
 
+// UpdateHandler godoc
+// @Summary Update rating
+// @Description Updates a rating by ID.
+// @Tags ratings
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Rating ID"
+// @Param body body models.Rating true "Update rating payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /ratings/{id} [put]
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -181,6 +255,19 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
 }
 
+// DeleteHandler godoc
+// @Summary Delete rating
+// @Description Deletes a rating by ID.
+// @Tags ratings
+// @Security BearerAuth
+// @Param id path int true "Rating ID"
+// @Success 204 {string} string
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /ratings/{id} [delete]
 func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {

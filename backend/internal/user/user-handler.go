@@ -26,6 +26,14 @@ func RegisterRoutes(r chi.Router, service *Service) {
 	})
 }
 
+// GetAllHandler godoc
+// @Summary List users
+// @Description Returns all users.
+// @Tags users
+// @Produce json
+// @Success 200 {array} models.User
+// @Failure 500 {string} string
+// @Router /users/ [get]
 func (h *Handler) GetAllHandler(w http.ResponseWriter, r *http.Request) {
 	users, err := h.Service.FindAll()
 	if err != nil {
@@ -36,6 +44,17 @@ func (h *Handler) GetAllHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(users)
 }
 
+// GetByIDHandler godoc
+// @Summary Get user by ID
+// @Description Returns a single user by ID.
+// @Tags users
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} models.User
+// @Failure 400 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /users/{id} [get]
 func (h *Handler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -62,6 +81,17 @@ type CreateUserRequest struct {
 	Password string `json:"password"`
 }
 
+// CreateHandler godoc
+// @Summary Create user
+// @Description Creates a new user.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param body body CreateUserRequest true "Create user payload"
+// @Success 201 {object} models.User
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /users/ [post]
 func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req CreateUserRequest
@@ -87,6 +117,18 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// UpdateHandler godoc
+// @Summary Update user
+// @Description Updates an existing user by ID.
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Param body body models.User true "Update user payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /users/{id} [put]
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -107,6 +149,16 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
 }
 
+// DeleteHandler godoc
+// @Summary Delete user
+// @Description Deletes a user by ID.
+// @Tags users
+// @Param id path int true "User ID"
+// @Success 204 {string} string
+// @Failure 400 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /users/{id} [delete]
 func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)

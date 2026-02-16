@@ -41,6 +41,17 @@ func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Han
 	})
 }
 
+// GetByIDHandler godoc
+// @Summary Get cafe by ID
+// @Description Returns a cafe listing by ID.
+// @Tags cafes
+// @Produce json
+// @Param id path int true "Cafe ID"
+// @Success 200 {object} models.CafeListing
+// @Failure 400 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /cafes/{id} [get]
 func (h *Handler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
@@ -61,6 +72,16 @@ func (h *Handler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(listing)
 }
 
+// ListMyHandler godoc
+// @Summary List my cafes
+// @Description Returns cafe listings owned by the authenticated user.
+// @Tags cafes
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {array} models.CafeListing
+// @Failure 401 {string} string
+// @Failure 500 {string} string
+// @Router /me/cafes [get]
 func (h *Handler) ListMyHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -76,6 +97,19 @@ func (h *Handler) ListMyHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(listings)
 }
 
+// CreateMyHandler godoc
+// @Summary Create my cafe
+// @Description Creates a cafe listing for the authenticated user.
+// @Tags cafes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body models.CafeListing true "Create cafe payload"
+// @Success 201 {object} models.CafeListing
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 500 {string} string
+// @Router /me/cafes [post]
 func (h *Handler) CreateMyHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -97,6 +131,19 @@ func (h *Handler) CreateMyHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(listing)
 }
 
+// ListByUserHandler godoc
+// @Summary List cafes by user
+// @Description Returns cafes for a user path parameter; must match authenticated user.
+// @Tags cafes
+// @Produce json
+// @Security BearerAuth
+// @Param userId path int true "User ID"
+// @Success 200 {array} models.CafeListing
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 500 {string} string
+// @Router /users/{userId}/cafes/ [get]
 func (h *Handler) ListByUserHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -122,6 +169,21 @@ func (h *Handler) ListByUserHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(listings)
 }
 
+// CreateHandler godoc
+// @Summary Create cafe by user route
+// @Description Creates a cafe via legacy user-scoped route; path userId must match authenticated user.
+// @Tags cafes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param userId path int true "User ID"
+// @Param body body models.CafeListing true "Create cafe payload"
+// @Success 201 {object} models.CafeListing
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 500 {string} string
+// @Router /users/{userId}/cafes/ [post]
 func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -153,6 +215,22 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(listing)
 }
 
+// UpdateHandler godoc
+// @Summary Update cafe
+// @Description Updates a cafe listing by ID.
+// @Tags cafes
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "Cafe ID"
+// @Param body body models.CafeListing true "Update cafe payload"
+// @Success 200 {object} map[string]string
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /cafes/{id} [put]
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -186,6 +264,19 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]string{"message": "updated"})
 }
 
+// DeleteHandler godoc
+// @Summary Delete cafe
+// @Description Deletes a cafe listing by ID.
+// @Tags cafes
+// @Security BearerAuth
+// @Param id path int true "Cafe ID"
+// @Success 204 {string} string
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 403 {string} string
+// @Failure 404 {string} string
+// @Failure 500 {string} string
+// @Router /cafes/{id} [delete]
 func (h *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {

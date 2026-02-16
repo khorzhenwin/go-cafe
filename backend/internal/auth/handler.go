@@ -50,6 +50,18 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	})
 }
 
+// LoginHandler godoc
+// @Summary Login user
+// @Description Authenticates a user and returns a JWT token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body LoginRequest true "Login payload"
+// @Success 200 {object} TokenResponse
+// @Failure 400 {string} string
+// @Failure 401 {string} string
+// @Failure 500 {string} string
+// @Router /auth/login [post]
 func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req LoginRequest
@@ -78,6 +90,17 @@ func (h *Handler) LoginHandler(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(TokenResponse{Token: token, ExpiresAt: expiresAt.Format(time.RFC3339)})
 }
 
+// RegisterHandler godoc
+// @Summary Register user
+// @Description Creates a new user account and returns a JWT token.
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body RegisterRequest true "Registration payload"
+// @Success 201 {object} TokenResponse
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /auth/register [post]
 func (h *Handler) RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var req RegisterRequest

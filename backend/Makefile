@@ -3,12 +3,13 @@
 
 ROOT := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 
-.PHONY: run build swagger test unit-test integration-test migrate-up migrate-down migrate-create teardown docker-up docker-down docker-check help
+.PHONY: run auth build swagger test unit-test integration-test migrate-up migrate-down migrate-create teardown docker-up docker-down docker-check help
 
 # Default target
 help:
 	@echo "Targets (run from backend or: make -C backend <target>):"
 	@echo "  make run             - Run the API server (requires .env and migrations applied)"
+	@echo "  make auth            - Print a JWT (registers or logs in a user at localhost:8080)"
 	@echo "  make swagger         - Generate Swagger docs to ./docs"
 	@echo "  make build           - Generate Swagger docs and build API binary to ./bin/api"
 	@echo "  make test            - Run unit tests only (no DB required)"
@@ -24,6 +25,32 @@ help:
 
 run:
 	cd $(ROOT) && go run ./cmd/api
+
+# Print JWT for Swagger Auth button.
+# Optional overrides:
+#   make auth email=you@example.com password=secret123 name="Your Name" url=http://localhost:8080
+auth:
+	@cd $(ROOT) && \
+	EMAIL=$${email:-"dev+$$(date +%s)@example.com"}; \
+	PASSWORD=$${password:-secret123}; \
+	NAME=$${name:-"Dev User"}; \
+	URL=$${url:-http://localhost:8080}; \
+	REG_RESP=$$(curl -s -X POST "$$URL/api/v1/auth/register" \
+		-H "Content-Type: application/json" \
+		-d "{\"email\":\"$$EMAIL\",\"name\":\"$$NAME\",\"password\":\"$$PASSWORD\"}"); \
+	TOKEN=$$(printf '%s' "$$REG_RESP" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p'); \
+	if [ -z "$$TOKEN" ]; then \
+		LOGIN_RESP=$$(curl -s -X POST "$$URL/api/v1/auth/login" \
+			-H "Content-Type: application/json" \
+			-d "{\"email\":\"$$EMAIL\",\"password\":\"$$PASSWORD\"}"); \
+		TOKEN=$$(printf '%s' "$$LOGIN_RESP" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p'); \
+	fi; \
+	if [ -z "$$TOKEN" ]; then \
+		echo "Failed to obtain JWT. Is the API running at $$URL?"; \
+		echo "Try: make docker-up"; \
+		exit 1; \
+	fi; \
+	echo "$$TOKEN"
 
 swagger:
 	cd $(ROOT) && go run github.com/swaggo/swag/cmd/swag@latest init -g main.go -d ./cmd/api,./internal -o ./docs --parseInternal
@@ -91,6 +118,9 @@ docker-down: docker-check
 	else \
 		docker rm -f go-cafe-backend >/dev/null 2>&1 || true; \
 	fi
+
+up: docker-up
+down: docker-down
 
 # Teardown: stop app, roll back migrations (drops gocafe_* tables) and remove bin/
 teardown:

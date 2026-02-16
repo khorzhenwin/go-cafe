@@ -9,6 +9,9 @@ import (
 // @version 1.0
 // @description API for users, cafe listings, and ratings.
 // @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 type application struct {
 	config config

@@ -189,6 +189,49 @@ Common backend targets:
 - `make -C backend migrate-down`
 - `make -C backend docker-up`
 - `make -C backend docker-down`
+- `make -C backend auth` (prints JWT token)
+
+## Compact backend API verification checklist
+
+Use this before frontend integration to confirm backend contract + persistence behavior.
+
+Prerequisites:
+
+- `make -C backend docker-up`
+- `TOKEN=$(make -C backend auth)`
+
+Core persistence checks (POST -> GET, PUT -> GET, DELETE -> GET):
+
+- Auth: register + login return JWT.
+- Users: create, read by id, list, update, delete.
+- Cafes: create under `/me/cafes`, list under `/me/cafes`, get by id, update/delete owner-only.
+- Ratings: create under `/cafes/{id}/ratings/`, list by cafe, get by id, update/delete owner-only.
+- User-scoped legacy routes: `/users/{userId}/cafes/` and `/users/{userId}/ratings/`.
+
+Expected status behavior:
+
+- `200/201/204` on successful operations.
+- `400` for malformed payloads/IDs.
+- `401` for missing/invalid JWT on protected routes.
+- `403` for authenticated but non-owner access on owner-scoped routes.
+- `404` for non-existent numeric IDs.
+
+Quick smoke examples:
+
+```bash
+# register/login token
+make -C backend auth
+
+# create cafe
+curl -s -X POST http://localhost:8080/api/v1/me/cafes \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"name":"Smoke Cafe","address":"123 Test","description":"smoke"}'
+
+# list my cafes (verify stored values)
+curl -s http://localhost:8080/api/v1/me/cafes \
+  -H "Authorization: Bearer $TOKEN"
+```
 
 ## Definition of done for requirement changes
 
@@ -203,3 +246,4 @@ For any PR that changes behavior across backend/frontend:
 ## Change log for requirements
 
 - `2026-02-16`: Created the initial live requirements README with architecture, API contract, DB schema, environment variables, and maintenance protocol.
+- `2026-02-16`: Added compact backend API verification checklist and `make auth` usage to standardize pre-frontend backend validation.
