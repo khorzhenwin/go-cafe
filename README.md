@@ -196,6 +196,9 @@ Vercel setup:
 From repository root:
 
 ```bash
+make run
+
+# or run services separately
 make -C backend help
 make -C backend migrate-up
 make -C backend run
