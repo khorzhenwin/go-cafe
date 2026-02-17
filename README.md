@@ -215,6 +215,8 @@ Common backend targets:
 - `make -C backend docker-up`
 - `make -C backend docker-down`
 - `make -C backend auth` (prints JWT token)
+- `make -C backend teardown` (non-destructive cleanup)
+- `make -C backend teardown-reset` (destructive local reset; rolls back migration)
 
 Common frontend commands:
 
@@ -279,3 +281,4 @@ For any PR that changes behavior across backend/frontend:
 - `2026-02-16`: Created the initial live requirements README with architecture, API contract, DB schema, environment variables, and maintenance protocol.
 - `2026-02-16`: Added compact backend API verification checklist and `make auth` usage to standardize pre-frontend backend validation.
 - `2026-02-16`: Reworked frontend into a product-style flow (signup/login, listings CRUD + sorting, review CRUD) and switched API calls through a Next.js proxy route for Vercel compatibility.
+- `2026-02-17`: Enhanced frontend visual design with interactive 3D-style motion accents including a spinning teacup and animated ambient elements.

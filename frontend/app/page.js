@@ -273,9 +273,32 @@ export default function HomePage() {
 
   return (
     <main className="app-shell">
+      <div className="splash-screen" aria-hidden="true">
+        <div className="splash-ring ring-a" />
+        <div className="splash-ring ring-b" />
+        <div className="splash-ring ring-c" />
+        <div className="splash-bean bean-a" />
+        <div className="splash-bean bean-b" />
+        <div className="splash-bean bean-c" />
+        <div className="splash-cup-wrap">
+          <div className="cup-3d auto-spin">
+            <span className="cup-shadow" />
+            <span className="cup-saucer" />
+            <span className="cup-body" />
+            <span className="cup-handle" />
+            <span className="cup-steam steam-a" />
+            <span className="cup-steam steam-b" />
+            <span className="cup-steam steam-c" />
+          </div>
+        </div>
+      </div>
+      <div className="bg-blob blob-a" />
+      <div className="bg-blob blob-b" />
       <header className="hero">
-        <h1>Cafe Hub</h1>
-        <p className="muted">Sign up, create cafe listings, write reviews, and sort your collection.</p>
+        <div>
+          <h1>Cafe Hub</h1>
+          <p className="muted">Sign up, create cafe listings, write reviews, and sort your collection.</p>
+        </div>
       </header>
 
       {!isAuthed ? (

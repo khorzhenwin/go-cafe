@@ -3,7 +3,7 @@
 
 ROOT := $(patsubst %/,%,$(dir $(abspath $(firstword $(MAKEFILE_LIST)))))
 
-.PHONY: run auth build swagger test unit-test integration-test migrate-up migrate-down migrate-create teardown docker-up docker-down docker-check help
+.PHONY: run auth build swagger test unit-test integration-test migrate-up migrate-down migrate-create teardown teardown-reset docker-up docker-down docker-check help
 
 # Default target
 help:
@@ -21,7 +21,8 @@ help:
 	@echo "  make docker-check    - Verify Docker CLI and daemon status"
 	@echo "  make docker-up       - Build and run the app via docker-compose"
 	@echo "  make docker-down     - Stop docker-compose and remove containers"
-	@echo "  make teardown        - Stop app, roll back migrations, remove build artifacts"
+	@echo "  make teardown        - Stop app/containers and remove build artifacts (non-destructive)"
+	@echo "  make teardown-reset  - DESTRUCTIVE: teardown + rollback one migration"
 
 run:
 	cd $(ROOT) && go run ./cmd/api
@@ -122,7 +123,7 @@ docker-down: docker-check
 up: docker-up
 down: docker-down
 
-# Teardown: stop app, roll back migrations (drops gocafe_* tables) and remove bin/
+# Teardown: stop app/containers and remove bin/ (non-destructive; keeps DB tables/data)
 teardown:
 	@echo "Stopping any process on :8080 (if present)..."
 	@if command -v lsof >/dev/null 2>&1; then \
@@ -136,6 +137,11 @@ teardown:
 	else \
 		docker rm -f go-cafe-backend >/dev/null 2>&1 || true; \
 	fi
-	cd $(ROOT) && go run ./cmd/migrate down 2>/dev/null || true
 	@rm -rf $(ROOT)/bin
-	@echo "Teardown complete: migrations rolled back, bin/ removed"
+	@echo "Teardown complete: containers stopped, bin/ removed, DB preserved"
+
+# Destructive reset for local-only workflows.
+teardown-reset: teardown
+	@echo "WARNING: rolling back one migration (destructive depending on migration)"
+	cd $(ROOT) && go run ./cmd/migrate down 2>/dev/null || true
+	@echo "Teardown reset complete: migration rolled back"

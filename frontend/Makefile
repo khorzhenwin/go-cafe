@@ -1,4 +1,9 @@
-.PHONY: run-frontend-helper
+.PHONY: run-frontend-helper teardown-helper
 
 run-frontend-helper:
-	npm run dev
+	@rm -rf .next/dev .next/server
+	exec npm run dev
+
+teardown-helper:
+	@rm -rf .next
+	@echo "Frontend teardown complete: removed .next/"

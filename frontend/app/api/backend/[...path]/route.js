@@ -1,7 +1,8 @@
 const BACKEND_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080";
 
-async function forward(request, params) {
-  const path = (params.path || []).join("/");
+async function forward(request, paramsPromise) {
+  const params = await paramsPromise;
+  const path = (params?.path || []).join("/");
   const url = `${BACKEND_BASE_URL}/api/v1/${path}${request.nextUrl.search || ""}`;
 
   const headers = new Headers();
