@@ -176,6 +176,7 @@ func (h *Handler) ListByUserHandler(w http.ResponseWriter, r *http.Request) {
 // @Success 201 {object} models.Rating
 // @Failure 400 {string} string
 // @Failure 401 {string} string
+// @Failure 404 {string} string
 // @Failure 500 {string} string
 // @Router /cafes/{id}/ratings/ [post]
 func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
@@ -199,6 +200,14 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	rating.CafeListingID = uint(cafeID)
 	rating.UserID = userID
 	if err := h.Service.CreateRating(&rating); err != nil {
+		if errors.Is(err, ErrCafeNotVisited) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Cafe listing not found", http.StatusNotFound)
+			return
+		}
 		http.Error(w, "Failed to create rating", http.StatusInternalServerError)
 		return
 	}

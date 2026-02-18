@@ -11,4 +11,5 @@ type CafeListing struct {
 	Name        string     `gorm:"not null" json:"name"`
 	Address     string     `json:"address"`
 	Description string     `json:"description,omitempty"`
+	VisitStatus string     `gorm:"not null;default:to_visit;index" json:"visit_status"`
 }

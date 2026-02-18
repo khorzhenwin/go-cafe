@@ -11,8 +11,14 @@ type Storage interface {
 	Create(listing *models.CafeListing) error
 	GetByID(id uint) (*models.CafeListing, error)
 	GetByUserID(userID uint) ([]models.CafeListing, error)
+	GetByUserIDFiltered(userID uint, filter ListFilter) ([]models.CafeListing, error)
 	Update(id uint, updated models.CafeListing) error
 	Delete(id uint) error
+}
+
+type ListFilter struct {
+	VisitStatus string
+	Sort        string
 }
 
 type Repository struct {
@@ -37,8 +43,29 @@ func (r *Repository) GetByID(id uint) (*models.CafeListing, error) {
 }
 
 func (r *Repository) GetByUserID(userID uint) ([]models.CafeListing, error) {
+	return r.GetByUserIDFiltered(userID, ListFilter{})
+}
+
+func (r *Repository) GetByUserIDFiltered(userID uint, filter ListFilter) ([]models.CafeListing, error) {
 	var listings []models.CafeListing
-	err := r.db.Where("user_id = ?", userID).Find(&listings).Error
+	q := r.db.Where("user_id = ?", userID)
+	if filter.VisitStatus != "" {
+		q = q.Where("visit_status = ?", filter.VisitStatus)
+	}
+	orderBy := "updated_at DESC"
+	switch filter.Sort {
+	case "created_desc":
+		orderBy = "created_at DESC"
+	case "name_asc":
+		orderBy = "name ASC"
+	case "name_desc":
+		orderBy = "name DESC"
+	case "status_asc":
+		orderBy = "visit_status ASC, updated_at DESC"
+	case "status_desc":
+		orderBy = "visit_status DESC, updated_at DESC"
+	}
+	err := q.Order(orderBy).Find(&listings).Error
 	return listings, err
 }
 
@@ -50,6 +77,7 @@ func (r *Repository) Update(id uint, updated models.CafeListing) error {
 	existing.Name = updated.Name
 	existing.Address = updated.Address
 	existing.Description = updated.Description
+	existing.VisitStatus = updated.VisitStatus
 	return r.db.Save(&existing).Error
 }
 

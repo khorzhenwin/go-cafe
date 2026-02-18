@@ -29,7 +29,7 @@ func New(dbConn *gorm.DB, authCfg *appconfig.AuthConfig, srvCfg Config) http.Han
 	cafeRepo := cafelisting.NewRepository(dbConn)
 	cafeSvc := cafelisting.NewService(cafeRepo)
 	ratingRepo := rating.NewRepository(dbConn)
-	ratingSvc := rating.NewService(ratingRepo)
+	ratingSvc := rating.NewService(ratingRepo, cafeSvc)
 
 	authMiddleware := auth.Middleware(authCfg)
 	authHandler := &auth.Handler{AuthCfg: authCfg, Finder: userSvc, Creator: userSvc}

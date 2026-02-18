@@ -9,12 +9,12 @@ import (
 )
 
 type mockCafeStorage struct {
-	listings   []models.CafeListing
-	getByID    *models.CafeListing
+	listings    []models.CafeListing
+	getByID     *models.CafeListing
 	getByIDErr error
-	createErr error
-	updateErr error
-	deleteErr error
+	createErr   error
+	updateErr   error
+	deleteErr   error
 }
 
 func (m *mockCafeStorage) Create(c *models.CafeListing) error {
@@ -34,9 +34,16 @@ func (m *mockCafeStorage) GetByID(id uint) (*models.CafeListing, error) {
 }
 
 func (m *mockCafeStorage) GetByUserID(userID uint) ([]models.CafeListing, error) {
+	return m.GetByUserIDFiltered(userID, ListFilter{})
+}
+
+func (m *mockCafeStorage) GetByUserIDFiltered(userID uint, filter ListFilter) ([]models.CafeListing, error) {
 	var out []models.CafeListing
 	for _, l := range m.listings {
 		if l.UserID == userID {
+			if filter.VisitStatus != "" && l.VisitStatus != filter.VisitStatus {
+				continue
+			}
 			out = append(out, l)
 		}
 	}
@@ -55,6 +62,15 @@ func TestService_CreateListing(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, m.listings, 1)
 	assert.Equal(t, "Cafe A", m.listings[0].Name)
+	assert.Equal(t, VisitStatusToVisit, m.listings[0].VisitStatus)
+}
+
+func TestService_CreateListing_InvalidVisitStatus(t *testing.T) {
+	m := &mockCafeStorage{}
+	svc := NewService(m)
+	listing := &models.CafeListing{UserID: 1, Name: "Cafe A", VisitStatus: "unknown"}
+	err := svc.CreateListing(listing)
+	assert.ErrorIs(t, err, ErrInvalidVisitStatus)
 }
 
 func TestService_UpdateListing_NotOwner(t *testing.T) {
@@ -65,11 +81,18 @@ func TestService_UpdateListing_NotOwner(t *testing.T) {
 }
 
 func TestService_UpdateListing_Owner(t *testing.T) {
-	m := &mockCafeStorage{getByID: &models.CafeListing{ID: 1, UserID: 10}}
+	m := &mockCafeStorage{getByID: &models.CafeListing{ID: 1, UserID: 10, VisitStatus: VisitStatusToVisit}}
 	svc := NewService(m)
-	err := svc.UpdateListing(1, 10, models.CafeListing{Name: "New Name"})
+	err := svc.UpdateListing(1, 10, models.CafeListing{Name: "New Name", VisitStatus: VisitStatusVisited})
 	require.NoError(t, err)
 	assert.NoError(t, m.updateErr)
+}
+
+func TestService_UpdateListing_InvalidVisitStatus(t *testing.T) {
+	m := &mockCafeStorage{getByID: &models.CafeListing{ID: 1, UserID: 10, VisitStatus: VisitStatusToVisit}}
+	svc := NewService(m)
+	err := svc.UpdateListing(1, 10, models.CafeListing{Name: "New Name", VisitStatus: "bad_status"})
+	assert.ErrorIs(t, err, ErrInvalidVisitStatus)
 }
 
 func TestService_DeleteListing_NotOwner(t *testing.T) {

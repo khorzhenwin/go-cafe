@@ -78,7 +78,10 @@ func (h *Handler) GetByIDHandler(w http.ResponseWriter, r *http.Request) {
 // @Tags cafes
 // @Produce json
 // @Security BearerAuth
+// @Param status query string false "Filter by status (to_visit|visited)"
+// @Param sort query string false "Sort: updated_desc|created_desc|name_asc|name_desc|status_asc|status_desc"
 // @Success 200 {array} models.CafeListing
+// @Failure 400 {string} string
 // @Failure 401 {string} string
 // @Failure 500 {string} string
 // @Router /me/cafes [get]
@@ -88,8 +91,14 @@ func (h *Handler) ListMyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	listings, err := h.Service.GetByUserID(userID)
+	visitStatus := r.URL.Query().Get("status")
+	sort := r.URL.Query().Get("sort")
+	listings, err := h.Service.GetByUserIDFiltered(userID, visitStatus, sort)
 	if err != nil {
+		if errors.Is(err, ErrInvalidVisitStatus) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Failed to retrieve cafe listings", http.StatusInternalServerError)
 		return
 	}
@@ -124,6 +133,10 @@ func (h *Handler) CreateMyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	listing.UserID = userID
 	if err := h.Service.CreateListing(&listing); err != nil {
+		if errors.Is(err, ErrInvalidVisitStatus) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Failed to create cafe listing", http.StatusInternalServerError)
 		return
 	}
@@ -138,6 +151,8 @@ func (h *Handler) CreateMyHandler(w http.ResponseWriter, r *http.Request) {
 // @Produce json
 // @Security BearerAuth
 // @Param userId path int true "User ID"
+// @Param status query string false "Filter by status (to_visit|visited)"
+// @Param sort query string false "Sort: updated_desc|created_desc|name_asc|name_desc|status_asc|status_desc"
 // @Success 200 {array} models.CafeListing
 // @Failure 400 {string} string
 // @Failure 401 {string} string
@@ -160,8 +175,14 @@ func (h *Handler) ListByUserHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
-	listings, err := h.Service.GetByUserID(userID)
+	visitStatus := r.URL.Query().Get("status")
+	sort := r.URL.Query().Get("sort")
+	listings, err := h.Service.GetByUserIDFiltered(userID, visitStatus, sort)
 	if err != nil {
+		if errors.Is(err, ErrInvalidVisitStatus) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Failed to retrieve cafe listings", http.StatusInternalServerError)
 		return
 	}
@@ -208,6 +229,10 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	listing.UserID = userID
 	if err := h.Service.CreateListing(&listing); err != nil {
+		if errors.Is(err, ErrInvalidVisitStatus) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		http.Error(w, "Failed to create cafe listing", http.StatusInternalServerError)
 		return
 	}
@@ -251,6 +276,10 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if err := h.Service.UpdateListing(uint(id), userID, listing); err != nil {
 		if errors.Is(err, ErrNotOwner) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, ErrInvalidVisitStatus) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {

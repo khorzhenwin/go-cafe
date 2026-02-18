@@ -1,13 +1,20 @@
 package rating
 
-import "github.com/khorzhenwin/go-cafe/backend/internal/models"
+import (
+	"github.com/khorzhenwin/go-cafe/backend/internal/models"
+)
 
 type Service struct {
-	store Storage
+	store      Storage
+	cafeLookup interface {
+		IsListingVisited(id uint) (bool, error)
+	}
 }
 
-func NewService(store Storage) *Service {
-	return &Service{store: store}
+func NewService(store Storage, cafeLookup interface {
+	IsListingVisited(id uint) (bool, error)
+}) *Service {
+	return &Service{store: store, cafeLookup: cafeLookup}
 }
 
 func (s *Service) GetByID(id uint) (*models.Rating, error) {
@@ -23,6 +30,15 @@ func (s *Service) GetByUserID(userID uint) ([]models.Rating, error) {
 }
 
 func (s *Service) CreateRating(rating *models.Rating) error {
+	if s.cafeLookup != nil {
+		visited, err := s.cafeLookup.IsListingVisited(rating.CafeListingID)
+		if err != nil {
+			return err
+		}
+		if !visited {
+			return ErrCafeNotVisited
+		}
+	}
 	return s.store.Create(rating)
 }
 

@@ -104,12 +104,28 @@ Public:
 
 Protected:
 
-- `GET /api/v1/me/cafes`
+- `GET /api/v1/me/cafes` (supports query: `status`, `sort`)
 - `POST /api/v1/me/cafes`
-- `GET /api/v1/users/{userId}/cafes/` (requires `{userId}` to match JWT subject)
+- `GET /api/v1/users/{userId}/cafes/` (requires `{userId}` to match JWT subject; supports `status`, `sort`)
 - `POST /api/v1/users/{userId}/cafes/` (requires `{userId}` to match JWT subject)
 - `PUT /api/v1/cafes/{id}` (owner only)
 - `DELETE /api/v1/cafes/{id}` (owner only)
+
+Cafe status rules:
+
+- `visit_status` values: `to_visit`, `visited`.
+- Default on create: `to_visit`.
+- Ratings can only be created for cafes marked `visited`.
+- Invalid status values return `400`.
+
+Cafe sort options (`sort` query):
+
+- `updated_desc` (default)
+- `created_desc`
+- `name_asc`
+- `name_desc`
+- `status_asc`
+- `status_desc`
 
 ### Rating endpoints
 
@@ -125,6 +141,10 @@ Protected:
 - `GET /api/v1/users/{userId}/ratings/` (requires `{userId}` to match JWT subject)
 - `PUT /api/v1/ratings/{id}` (owner only)
 - `DELETE /api/v1/ratings/{id}` (owner only)
+
+Rating creation rule:
+
+- `POST /api/v1/cafes/{id}/ratings/` returns `400` if the cafe is still `to_visit`.
 
 ## Database requirements
 
@@ -143,6 +163,7 @@ Current schema (from `000001_create_gocafe_tables.up.sql`):
   - `id` (PK), `created_at`, `updated_at`
   - `user_id` (FK -> `gocafe_users.id`, cascade delete)
   - `name` (required), `address`, `description`
+  - `visit_status` (required; `to_visit` or `visited`; default `to_visit`)
 - `gocafe_ratings`
   - `id` (PK), `created_at`, `updated_at`
   - `user_id` (FK -> `gocafe_users.id`, cascade delete)
@@ -153,6 +174,7 @@ Indexes:
 
 - `gocafe_users.email`
 - `gocafe_cafe_listings.user_id`
+- `gocafe_cafe_listings.visit_status`
 - `gocafe_ratings.user_id`
 - `gocafe_ratings.cafe_listing_id`
 
@@ -282,3 +304,4 @@ For any PR that changes behavior across backend/frontend:
 - `2026-02-16`: Added compact backend API verification checklist and `make auth` usage to standardize pre-frontend backend validation.
 - `2026-02-16`: Reworked frontend into a product-style flow (signup/login, listings CRUD + sorting, review CRUD) and switched API calls through a Next.js proxy route for Vercel compatibility.
 - `2026-02-17`: Enhanced frontend visual design with interactive 3D-style motion accents including a spinning teacup and animated ambient elements.
+- `2026-02-18`: Added cafe `visit_status` (`to_visit`/`visited`), status-aware cafe filtering/sorting, and backend rule that ratings are allowed only for visited cafes.

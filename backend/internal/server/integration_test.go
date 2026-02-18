@@ -106,6 +106,38 @@ func TestIntegration_RegisterLoginAndCafeFlow(t *testing.T) {
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// 5. Rating should be blocked while cafe is to_visit
+	ratingBody := map[string]interface{}{
+		"visited_at": time.Now().UTC().Format(time.RFC3339),
+		"rating":     5,
+		"review":     "Great vibe",
+	}
+	ratingJSON, _ := json.Marshal(ratingBody)
+	req = httptest.NewRequest(http.MethodPost, base+"/cafes/"+strconv.FormatUint(uint64(cafeResp.ID), 10)+"/ratings/", bytes.NewReader(ratingJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+
+	// 6. Mark cafe as visited
+	updateCafeBody := map[string]string{"name": "Test Cafe", "address": "123 Main", "visit_status": "visited"}
+	updateCafeJSON, _ := json.Marshal(updateCafeBody)
+	req = httptest.NewRequest(http.MethodPut, base+"/cafes/"+strconv.FormatUint(uint64(cafeResp.ID), 10), bytes.NewReader(updateCafeJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code, "update cafe status: %s", rec.Body.String())
+
+	// 7. Rating now succeeds
+	req = httptest.NewRequest(http.MethodPost, base+"/cafes/"+strconv.FormatUint(uint64(cafeResp.ID), 10)+"/ratings/", bytes.NewReader(ratingJSON))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusCreated, rec.Code, "create rating: %s", rec.Body.String())
 }
 
 func init() {

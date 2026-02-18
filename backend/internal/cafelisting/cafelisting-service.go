@@ -18,10 +18,29 @@ func (s *Service) GetByID(id uint) (*models.CafeListing, error) {
 }
 
 func (s *Service) GetByUserID(userID uint) ([]models.CafeListing, error) {
-	return s.store.GetByUserID(userID)
+	return s.GetByUserIDFiltered(userID, "", "")
+}
+
+func (s *Service) GetByUserIDFiltered(userID uint, visitStatus, sort string) ([]models.CafeListing, error) {
+	status, err := normalizeVisitStatus(visitStatus)
+	if err != nil {
+		return nil, err
+	}
+	if visitStatus == "" {
+		status = ""
+	}
+	return s.store.GetByUserIDFiltered(userID, ListFilter{
+		VisitStatus: status,
+		Sort:        sort,
+	})
 }
 
 func (s *Service) CreateListing(listing *models.CafeListing) error {
+	status, err := normalizeVisitStatus(listing.VisitStatus)
+	if err != nil {
+		return err
+	}
+	listing.VisitStatus = status
 	return s.store.Create(listing)
 }
 
@@ -33,6 +52,11 @@ func (s *Service) UpdateListing(id uint, userID uint, updated models.CafeListing
 	if existing.UserID != userID {
 		return ErrNotOwner
 	}
+	status, err := normalizeVisitStatus(updated.VisitStatus)
+	if err != nil {
+		return err
+	}
+	updated.VisitStatus = status
 	return s.store.Update(id, updated)
 }
 
@@ -48,4 +72,15 @@ func (s *Service) DeleteListing(id uint, userID uint) error {
 		return ErrNotOwner
 	}
 	return s.store.Delete(id)
+}
+
+func (s *Service) IsListingVisited(id uint) (bool, error) {
+	existing, err := s.store.GetByID(id)
+	if err != nil {
+		return false, err
+	}
+	if existing == nil {
+		return false, gorm.ErrRecordNotFound
+	}
+	return existing.VisitStatus == VisitStatusVisited, nil
 }

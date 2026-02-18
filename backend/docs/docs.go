@@ -393,6 +393,12 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -417,6 +423,20 @@ const docTemplate = `{
                     "cafes"
                 ],
                 "summary": "List my cafes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Filter by status (to_visit|visited)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort: updated_desc|created_desc|name_asc|name_desc|status_asc|status_desc",
+                        "name": "sort",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -425,6 +445,12 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/models.CafeListing"
                             }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     "401": {
@@ -958,6 +984,18 @@ const docTemplate = `{
                         "name": "userId",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status (to_visit|visited)",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort: updated_desc|created_desc|name_asc|name_desc|status_asc|status_desc",
+                        "name": "sort",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1190,6 +1228,9 @@ const docTemplate = `{
                 },
                 "user_id": {
                     "type": "integer"
+                },
+                "visit_status": {
+                    "type": "string"
                 }
             }
         },
