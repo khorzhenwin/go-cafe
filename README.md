@@ -1,5 +1,7 @@
 # go-cafe
 
+![go-cafe journey UI preview](docs/images/journey-ui-preview.png)
+
 `go-cafe` is a cafe discovery and rating project with a Go backend and a frontend app.
 This README is the live source of truth for architecture, database requirements, and backend/frontend contracts.
 
