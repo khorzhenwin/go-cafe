@@ -6,13 +6,11 @@ import {
   createMyCafe,
   deleteCafe,
   deleteRating,
-  listCafeRatings,
   listMyCafes,
   listMyRatings,
   loginUser,
   registerUser,
-  updateCafe,
-  updateRating
+  updateCafe
 } from "@/lib/api";
 
 export default function HomePage() {
@@ -27,27 +25,23 @@ export default function HomePage() {
 
   const [cafes, setCafes] = useState([]);
   const [ratings, setRatings] = useState([]);
-  const [ratingByCafe, setRatingByCafe] = useState({});
+  const [pendingStatusById, setPendingStatusById] = useState({});
 
   const [cafeName, setCafeName] = useState("");
   const [cafeAddress, setCafeAddress] = useState("");
   const [cafeDescription, setCafeDescription] = useState("");
+  const [newCafeStatus, setNewCafeStatus] = useState("to_visit");
 
   const [selectedCafeId, setSelectedCafeId] = useState("");
   const [reviewRating, setReviewRating] = useState("5");
   const [reviewText, setReviewText] = useState("");
 
-  const [editCafeId, setEditCafeId] = useState("");
-  const [editCafeName, setEditCafeName] = useState("");
-  const [editCafeAddress, setEditCafeAddress] = useState("");
-  const [editCafeDescription, setEditCafeDescription] = useState("");
-
-  const [editRatingId, setEditRatingId] = useState("");
-  const [editRatingScore, setEditRatingScore] = useState("5");
-  const [editRatingReview, setEditRatingReview] = useState("");
   const [sortBy, setSortBy] = useState("updated_desc");
+  const [activeStep, setActiveStep] = useState(1);
 
   const isAuthed = useMemo(() => token.trim().length > 0, [token]);
+  const toVisitCafes = useMemo(() => cafes.filter((c) => c.visit_status === "to_visit"), [cafes]);
+  const visitedCafes = useMemo(() => cafes.filter((c) => c.visit_status === "visited"), [cafes]);
 
   useEffect(() => {
     const saved = window.localStorage.getItem("go-cafe-token");
@@ -59,21 +53,19 @@ export default function HomePage() {
     else window.localStorage.removeItem("go-cafe-token");
   }, [token]);
 
-  const cafesWithMeta = useMemo(() => {
-    const withMeta = cafes.map((cafe) => {
-      const cafeRatings = ratingByCafe[cafe.id] || [];
-      const count = cafeRatings.length;
-      const avg = count ? cafeRatings.reduce((acc, r) => acc + Number(r.rating || 0), 0) / count : 0;
-      return { ...cafe, rating_count: count, rating_avg: avg };
-    });
-    return withMeta.sort((a, b) => {
-      if (sortBy === "name_asc") return a.name.localeCompare(b.name);
-      if (sortBy === "name_desc") return b.name.localeCompare(a.name);
-      if (sortBy === "rating_desc") return b.rating_avg - a.rating_avg;
-      if (sortBy === "created_desc") return new Date(b.created_at) - new Date(a.created_at);
-      return new Date(b.updated_at) - new Date(a.updated_at);
-    });
-  }, [cafes, ratingByCafe, sortBy]);
+  useEffect(() => {
+    if (isAuthed) {
+      handleRefreshData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthed]);
+
+  useEffect(() => {
+    if (isAuthed) {
+      handleRefreshData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortBy]);
 
   async function handleRegister() {
     setError("");
@@ -111,18 +103,17 @@ export default function HomePage() {
     setMessage("");
     setLoading(true);
     try {
-      const [myCafes, myRatings] = await Promise.all([listMyCafes(token), listMyRatings(token)]);
+      const [myCafes, myRatings] = await Promise.all([listMyCafes(token, { sort: sortBy }), listMyRatings(token)]);
       const cafesData = myCafes || [];
       setCafes(cafesData);
       setRatings(myRatings || []);
-      const ratingsByCafeEntries = await Promise.all(
-        cafesData.map(async (cafe) => {
-          const cafeRatings = await listCafeRatings(cafe.id);
-          return [cafe.id, cafeRatings || []];
-        })
-      );
-      setRatingByCafe(Object.fromEntries(ratingsByCafeEntries));
       setSelectedCafeId((prev) => prev || String(cafesData[0]?.id || ""));
+      setPendingStatusById(
+        cafesData.reduce((acc, cafe) => {
+          acc[cafe.id] = cafe.visit_status || "to_visit";
+          return acc;
+        }, {})
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -136,10 +127,16 @@ export default function HomePage() {
     setMessage("");
     setLoading(true);
     try {
-      await createMyCafe(token, { name: cafeName, address: cafeAddress, description: cafeDescription });
+      await createMyCafe(token, {
+        name: cafeName,
+        address: cafeAddress,
+        description: cafeDescription,
+        visit_status: newCafeStatus
+      });
       setCafeName("");
       setCafeAddress("");
       setCafeDescription("");
+      setNewCafeStatus("to_visit");
       setMessage("Cafe listing created.");
       await handleRefreshData();
     } catch (err) {
@@ -149,18 +146,18 @@ export default function HomePage() {
     }
   }
 
-  async function handleUpdateCafe() {
-    if (!editCafeId) return;
+  async function handleUpdateCafeStatus(cafe) {
     setError("");
     setMessage("");
     setLoading(true);
     try {
-      await updateCafe(token, editCafeId, {
-        name: editCafeName,
-        address: editCafeAddress,
-        description: editCafeDescription
+      await updateCafe(token, cafe.id, {
+        name: cafe.name,
+        address: cafe.address,
+        description: cafe.description,
+        visit_status: pendingStatusById[cafe.id] || cafe.visit_status
       });
-      setMessage("Cafe listing updated.");
+      setMessage("Cafe status updated.");
       await handleRefreshData();
     } catch (err) {
       setError(err.message);
@@ -207,40 +204,6 @@ export default function HomePage() {
     }
   }
 
-  function startCafeEdit(cafe) {
-    setEditCafeId(String(cafe.id));
-    setEditCafeName(cafe.name || "");
-    setEditCafeAddress(cafe.address || "");
-    setEditCafeDescription(cafe.description || "");
-  }
-
-  function startRatingEdit(rating) {
-    setEditRatingId(String(rating.id));
-    setEditRatingScore(String(rating.rating || 5));
-    setEditRatingReview(rating.review || "");
-  }
-
-  async function handleUpdateRating() {
-    if (!editRatingId) return;
-    const original = ratings.find((r) => String(r.id) === String(editRatingId));
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      await updateRating(token, editRatingId, {
-        visited_at: original?.visited_at || new Date().toISOString(),
-        rating: Number(editRatingScore),
-        review: editRatingReview
-      });
-      setMessage("Review updated.");
-      await handleRefreshData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
   async function handleDeleteRating(ratingId) {
     setError("");
     setMessage("");
@@ -260,7 +223,7 @@ export default function HomePage() {
     setToken("");
     setCafes([]);
     setRatings([]);
-    setRatingByCafe({});
+    setPendingStatusById({});
     setMessage("Logged out.");
     setError("");
   }
@@ -274,57 +237,40 @@ export default function HomePage() {
   return (
     <main className="app-shell">
       <div className="splash-screen" aria-hidden="true">
-        <div className="splash-ring ring-a" />
-        <div className="splash-ring ring-b" />
-        <div className="splash-ring ring-c" />
-        <div className="splash-bean bean-a" />
-        <div className="splash-bean bean-b" />
-        <div className="splash-bean bean-c" />
-        <div className="splash-cup-wrap">
-          <div className="cup-3d auto-spin">
-            <span className="cup-shadow" />
-            <span className="cup-saucer" />
-            <span className="cup-body" />
-            <span className="cup-handle" />
-            <span className="cup-steam steam-a" />
-            <span className="cup-steam steam-b" />
-            <span className="cup-steam steam-c" />
-          </div>
-        </div>
+        <div className="vector-grid" />
+        <div className="vector-orb orb-a" />
+        <div className="vector-orb orb-b" />
+        <div className="vector-orb orb-c" />
+        <div className="vector-line line-a" />
+        <div className="vector-line line-b" />
+        <div className="vector-line line-c" />
       </div>
-      <div className="bg-blob blob-a" />
-      <div className="bg-blob blob-b" />
       <header className="hero">
         <div>
           <h1>Cafe Hub</h1>
-          <p className="muted">Sign up, create cafe listings, write reviews, and sort your collection.</p>
+          <p className="muted">
+            A simple cafe journey: <strong>add cafes</strong>, <strong>mark status</strong>, then{" "}
+            <strong>rate visited cafes</strong>.
+          </p>
         </div>
       </header>
 
       {!isAuthed ? (
-        <section className="card auth-card">
-          <div className="auth-tabs">
-            <button className={authMode === "signup" ? "tab active" : "tab"} onClick={() => setAuthMode("signup")}>
-              Sign up
-            </button>
-            <button className={authMode === "login" ? "tab active" : "tab"} onClick={() => setAuthMode("login")}>
-              Login
-            </button>
-          </div>
+        <section className="flow-section">
           <form onSubmit={handleAuthSubmit}>
-            <div className="row">
-              <div>
-                <label htmlFor="email">Email</label>
+            <div className="stack-fields">
+              <label htmlFor="email">
+                Email
                 <input id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </div>
+              </label>
               {authMode === "signup" ? (
-                <div>
-                  <label htmlFor="name">Display name</label>
+                <label htmlFor="name">
+                  Display name
                   <input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-                </div>
+                </label>
               ) : null}
-              <div>
-                <label htmlFor="password">Password</label>
+              <label htmlFor="password">
+                Password
                 <input
                   id="password"
                   type="password"
@@ -332,20 +278,28 @@ export default function HomePage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-              </div>
+              </label>
             </div>
             <div className="actions">
               <button type="submit" disabled={loading}>
                 {loading ? "Please wait..." : authMode === "signup" ? "Create account" : "Login"}
               </button>
             </div>
+            <div className="auth-tabs auth-tabs-bottom">
+              <button className={authMode === "signup" ? "tab active" : "tab"} onClick={() => setAuthMode("signup")}>
+                Sign up
+              </button>
+              <button className={authMode === "login" ? "tab active" : "tab"} onClick={() => setAuthMode("login")}>
+                Login
+              </button>
+            </div>
           </form>
         </section>
       ) : (
         <>
-          <section className="card">
+          <section className="flow-section">
             <div className="toolbar">
-              <h2>Workspace</h2>
+              <h2>Journey</h2>
               <div className="actions">
                 <button className="secondary" onClick={handleRefreshData} disabled={loading}>
                   Refresh data
@@ -355,242 +309,255 @@ export default function HomePage() {
                 </button>
               </div>
             </div>
-            <p className="muted">Session is active. You can now create cafes, add reviews, and sort listings.</p>
-          </section>
-
-          <section className="card">
-            <h2>Create a cafe listing</h2>
-            <div className="row">
-              <div>
-                <label htmlFor="cafeName">Cafe name</label>
-                <input id="cafeName" value={cafeName} onChange={(e) => setCafeName(e.target.value)} required />
-              </div>
-              <div>
-                <label htmlFor="cafeAddress">Address</label>
-                <input id="cafeAddress" value={cafeAddress} onChange={(e) => setCafeAddress(e.target.value)} />
-              </div>
-            </div>
-            <div style={{ marginTop: "0.75rem" }}>
-              <label htmlFor="cafeDescription">Description</label>
-              <textarea
-                id="cafeDescription"
-                value={cafeDescription}
-                onChange={(e) => setCafeDescription(e.target.value)}
-                placeholder="What makes this cafe special?"
-              />
-            </div>
-            <div className="actions">
-              <button onClick={handleCreateCafe} disabled={loading || !cafeName.trim()}>
-                Add cafe
+            <p className="muted">Follow steps in order. Reviews are available only after a cafe is marked visited.</p>
+            <div className="step-tabs" role="tablist" aria-label="Journey steps">
+              <button
+                className={activeStep === 1 ? "tab active" : "tab"}
+                onClick={() => setActiveStep(1)}
+                role="tab"
+                aria-selected={activeStep === 1}
+              >
+                Step 1 - Add cafe
+              </button>
+              <button
+                className={activeStep === 2 ? "tab active" : "tab"}
+                onClick={() => setActiveStep(2)}
+                role="tab"
+                aria-selected={activeStep === 2}
+              >
+                Step 2 - Update status
+              </button>
+              <button
+                className={activeStep === 3 ? "tab active" : "tab"}
+                onClick={() => setActiveStep(3)}
+                role="tab"
+                aria-selected={activeStep === 3}
+              >
+                Step 3 - Rate visited
               </button>
             </div>
           </section>
 
-          <section className="card">
-            <h2>Leave a review</h2>
-            <div className="row three">
-              <div>
-                <label htmlFor="selectedCafe">Cafe</label>
-                <select
-                  id="selectedCafe"
-                  value={selectedCafeId}
-                  onChange={(e) => setSelectedCafeId(e.target.value)}
-                  className="select"
-                >
-                  <option value="">Select a cafe</option>
-                  {cafesWithMeta.map((cafe) => (
-                    <option key={cafe.id} value={cafe.id}>
-                      {cafe.name} (#{cafe.id})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label htmlFor="reviewRating">Rating</label>
-                <select
-                  id="reviewRating"
-                  value={reviewRating}
-                  onChange={(e) => setReviewRating(e.target.value)}
-                  className="select"
-                >
-                  {[5, 4, 3, 2, 1].map((score) => (
-                    <option key={score} value={score}>
-                      {score} / 5
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div style={{ marginTop: "0.75rem" }}>
-              <label htmlFor="reviewText">Review / notes</label>
-              <textarea
-                id="reviewText"
-                value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
-                placeholder="Write your experience..."
-              />
-            </div>
-            <div className="actions">
-              <button onClick={handleCreateReview} disabled={loading || !selectedCafeId}>
-                Submit review
-              </button>
-            </div>
-          </section>
-
-          <section className="card">
-            <div className="toolbar">
-              <h2>My cafe listings</h2>
-              <div>
-                <label htmlFor="sortBy">Sort by</label>
-                <select id="sortBy" value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="select">
-                  <option value="updated_desc">Recently updated</option>
-                  <option value="created_desc">Newest created</option>
-                  <option value="rating_desc">Highest rating</option>
-                  <option value="name_asc">Name A-Z</option>
-                  <option value="name_desc">Name Z-A</option>
-                </select>
-              </div>
-            </div>
-            {cafesWithMeta.length === 0 ? (
-              <p className="muted">No cafes yet. Create your first listing above.</p>
-            ) : (
-              <div className="stack">
-                {cafesWithMeta.map((cafe) => (
-                  <article key={cafe.id} className="cafe-item">
-                    <div className="cafe-head">
-                      <div>
-                        <h3>{cafe.name}</h3>
-                        <p className="muted">
-                          {cafe.address || "No address provided"} - avg rating:{" "}
-                          {cafe.rating_count ? cafe.rating_avg.toFixed(1) : "n/a"} ({cafe.rating_count} review
-                          {cafe.rating_count === 1 ? "" : "s"})
-                        </p>
-                      </div>
-                      <div className="actions">
-                        <button className="secondary" onClick={() => startCafeEdit(cafe)}>
-                          Edit
-                        </button>
-                        <button className="danger" onClick={() => handleDeleteCafe(cafe.id)}>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                    <p>{cafe.description || "No description yet."}</p>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="card">
-            <h2>Edit cafe listing</h2>
-            {!editCafeId ? (
-              <p className="muted">Click Edit on a listing to load it here.</p>
-            ) : (
-              <>
-                <div className="row">
-                  <div>
-                    <label htmlFor="editCafeName">Cafe name</label>
-                    <input id="editCafeName" value={editCafeName} onChange={(e) => setEditCafeName(e.target.value)} />
-                  </div>
-                  <div>
-                    <label htmlFor="editCafeAddress">Address</label>
-                    <input
-                      id="editCafeAddress"
-                      value={editCafeAddress}
-                      onChange={(e) => setEditCafeAddress(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div style={{ marginTop: "0.75rem" }}>
-                  <label htmlFor="editCafeDescription">Description</label>
+          {activeStep === 1 ? (
+            <section className="flow-section">
+              <h2>Step 1 - Add your cafe</h2>
+              <div className="stack-fields">
+                <label>
+                  Cafe name
+                  <input value={cafeName} onChange={(e) => setCafeName(e.target.value)} required />
+                </label>
+                <label>
+                  Address
+                  <input value={cafeAddress} onChange={(e) => setCafeAddress(e.target.value)} />
+                </label>
+                <label>
+                  Initial status
+                  <select value={newCafeStatus} onChange={(e) => setNewCafeStatus(e.target.value)} className="select">
+                    <option value="to_visit">To Visit</option>
+                    <option value="visited">Visited</option>
+                  </select>
+                </label>
+                <label>
+                  Description
                   <textarea
-                    id="editCafeDescription"
-                    value={editCafeDescription}
-                    onChange={(e) => setEditCafeDescription(e.target.value)}
+                    value={cafeDescription}
+                    onChange={(e) => setCafeDescription(e.target.value)}
+                    placeholder="Why this cafe matters to you..."
                   />
-                </div>
-                <div className="actions">
-                  <button onClick={handleUpdateCafe} disabled={loading}>
-                    Save cafe changes
-                  </button>
-                </div>
-              </>
-            )}
-          </section>
+                </label>
+              </div>
+              <div className="actions">
+                <button onClick={handleCreateCafe} disabled={loading || !cafeName.trim()}>
+                  Add cafe
+                </button>
+                <button className="secondary" onClick={() => setActiveStep(2)} disabled={loading}>
+                  Continue to Step 2
+                </button>
+              </div>
+            </section>
+          ) : null}
 
-          <section className="card">
-            <h2>My reviews</h2>
+          {activeStep === 2 ? (
+            <section className="flow-section">
+              <div className="toolbar">
+                <h2>Step 2 - Update journey status</h2>
+                <label>
+                  Sort
+                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="select">
+                    <option value="updated_desc">Recently updated</option>
+                    <option value="created_desc">Newest created</option>
+                    <option value="name_asc">Name A-Z</option>
+                    <option value="name_desc">Name Z-A</option>
+                    <option value="status_asc">Status A-Z</option>
+                    <option value="status_desc">Status Z-A</option>
+                  </select>
+                </label>
+              </div>
+              <p className="muted">Mark cafes as visited before adding ratings.</p>
+              {cafes.length === 0 ? (
+                <p className="muted">No cafes yet. Complete Step 1 first.</p>
+              ) : (
+                <div className="status-layout">
+                  <div>
+                    <h3>To Visit</h3>
+                    {toVisitCafes.length === 0 ? (
+                      <p className="muted">None</p>
+                    ) : (
+                      toVisitCafes.map((cafe) => (
+                        <div key={cafe.id} className="list-row">
+                          <div>
+                            <strong>{cafe.name}</strong>
+                            <p className="muted">{cafe.address || "No address"}</p>
+                          </div>
+                          <div className="row-actions">
+                            <select
+                              className="select"
+                              value={pendingStatusById[cafe.id] || cafe.visit_status}
+                              onChange={(e) =>
+                                setPendingStatusById((prev) => ({ ...prev, [cafe.id]: e.target.value }))
+                              }
+                            >
+                              <option value="to_visit">To Visit</option>
+                              <option value="visited">Visited</option>
+                            </select>
+                            <button
+                              className="secondary"
+                              onClick={() => handleUpdateCafeStatus(cafe)}
+                              disabled={loading}
+                            >
+                              Save
+                            </button>
+                            <button className="ghost" onClick={() => handleDeleteCafe(cafe.id)} disabled={loading}>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  <div>
+                    <h3>Visited</h3>
+                    {visitedCafes.length === 0 ? (
+                      <p className="muted">None yet</p>
+                    ) : (
+                      visitedCafes.map((cafe) => (
+                        <div key={cafe.id} className="list-row">
+                          <div>
+                            <strong>{cafe.name}</strong>
+                            <p className="muted">{cafe.address || "No address"}</p>
+                          </div>
+                          <div className="row-actions">
+                            <select
+                              className="select"
+                              value={pendingStatusById[cafe.id] || cafe.visit_status}
+                              onChange={(e) =>
+                                setPendingStatusById((prev) => ({ ...prev, [cafe.id]: e.target.value }))
+                              }
+                            >
+                              <option value="to_visit">To Visit</option>
+                              <option value="visited">Visited</option>
+                            </select>
+                            <button
+                              className="secondary"
+                              onClick={() => handleUpdateCafeStatus(cafe)}
+                              disabled={loading}
+                            >
+                              Save
+                            </button>
+                            <button className="ghost" onClick={() => handleDeleteCafe(cafe.id)} disabled={loading}>
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+              <div className="actions">
+                <button className="ghost" onClick={() => setActiveStep(1)} disabled={loading}>
+                  Back to Step 1
+                </button>
+                <button className="secondary" onClick={() => setActiveStep(3)} disabled={loading}>
+                  Continue to Step 3
+                </button>
+              </div>
+            </section>
+          ) : null}
+
+          {activeStep === 3 ? (
+            <section className="flow-section">
+              <h2>Step 3 - Rate visited cafes</h2>
+              <div className="stack-fields">
+                <label>
+                  Cafe
+                  <select value={selectedCafeId} onChange={(e) => setSelectedCafeId(e.target.value)} className="select">
+                    <option value="">Select visited cafe</option>
+                    {visitedCafes.map((cafe) => (
+                      <option key={cafe.id} value={cafe.id}>
+                        {cafe.name} (#{cafe.id})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Rating
+                  <select value={reviewRating} onChange={(e) => setReviewRating(e.target.value)} className="select">
+                    {[5, 4, 3, 2, 1].map((score) => (
+                      <option key={score} value={score}>
+                        {score}/5
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Review
+                  <textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    placeholder="How was your visit?"
+                  />
+                </label>
+              </div>
+              <div className="actions">
+                <button onClick={handleCreateReview} disabled={loading || !selectedCafeId || visitedCafes.length === 0}>
+                  Submit review
+                </button>
+                <button className="ghost" onClick={() => setActiveStep(2)} disabled={loading}>
+                  Back to Step 2
+                </button>
+              </div>
+              {visitedCafes.length === 0 ? (
+                <p className="muted">No visited cafes yet. Complete Step 2 first.</p>
+              ) : null}
+            </section>
+          ) : null}
+
+          <section className="flow-section">
+            <h2>Recent reviews</h2>
             {ratings.length === 0 ? (
               <p className="muted">No reviews yet.</p>
             ) : (
-              <div className="stack">
+              <div className="review-list">
                 {ratings.map((rating) => (
-                  <article key={rating.id} className="review-item">
-                    <div className="toolbar">
-                      <strong>
-                        Cafe #{rating.cafe_listing_id} - {rating.rating}/5
-                      </strong>
-                      <div className="actions">
-                        <button className="secondary" onClick={() => startRatingEdit(rating)}>
-                          Edit
-                        </button>
-                        <button className="danger" onClick={() => handleDeleteRating(rating.id)}>
-                          Delete
-                        </button>
-                      </div>
-                    </div>
+                  <article key={rating.id} className="review-line">
+                    <strong>
+                      Cafe #{rating.cafe_listing_id} - {rating.rating}/5
+                    </strong>
                     <p>{rating.review || "No review text."}</p>
+                    <button className="ghost" onClick={() => handleDeleteRating(rating.id)} disabled={loading}>
+                      Delete
+                    </button>
                   </article>
                 ))}
               </div>
-            )}
-          </section>
-
-          <section className="card">
-            <h2>Edit review</h2>
-            {!editRatingId ? (
-              <p className="muted">Click Edit on one of your reviews to modify it.</p>
-            ) : (
-              <>
-                <div className="row three">
-                  <div>
-                    <label htmlFor="editRatingScore">Score</label>
-                    <select
-                      id="editRatingScore"
-                      value={editRatingScore}
-                      onChange={(e) => setEditRatingScore(e.target.value)}
-                      className="select"
-                    >
-                      {[5, 4, 3, 2, 1].map((score) => (
-                        <option key={score} value={score}>
-                          {score} / 5
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div style={{ marginTop: "0.75rem" }}>
-                  <label htmlFor="editRatingReview">Review text</label>
-                  <textarea
-                    id="editRatingReview"
-                    value={editRatingReview}
-                    onChange={(e) => setEditRatingReview(e.target.value)}
-                  />
-                </div>
-                <div className="actions">
-                  <button onClick={handleUpdateRating} disabled={loading}>
-                    Save review changes
-                  </button>
-                </div>
-              </>
             )}
           </section>
         </>
       )}
 
-      {message ? <section className="card success">{message}</section> : null}
-      {error ? <section className="card error">{error}</section> : null}
+      {message ? <section className="flow-section success">{message}</section> : null}
+      {error ? <section className="flow-section error">{error}</section> : null}
       {!isAuthed ? null : loading ? <p className="muted">Loading...</p> : null}
     </main>
   );

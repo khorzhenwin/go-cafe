@@ -47,8 +47,12 @@ export function loginUser(body) {
   });
 }
 
-export function listMyCafes(token) {
-  return request("/me/cafes", {
+export function listMyCafes(token, query = {}) {
+  const params = new URLSearchParams();
+  if (query.status) params.set("status", query.status);
+  if (query.sort) params.set("sort", query.sort);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return request(`/me/cafes${suffix}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
 }
