@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/khorzhenwin/go-cafe/backend/internal/auth"
@@ -13,12 +14,24 @@ import (
 )
 
 type Handler struct {
-	Service *Service
+	Service      *Service
+	Autocomplete AddressAutocompleteProvider
 }
 
 // RegisterRoutes registers cafe listing routes. Pass authMiddleware for protected routes (required for create/update/delete and /me).
-func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Handler) http.Handler) {
-	h := &Handler{Service: service}
+func RegisterRoutes(
+	r chi.Router,
+	service *Service,
+	authMiddleware func(http.Handler) http.Handler,
+	autocompleteProvider AddressAutocompleteProvider,
+) {
+	if autocompleteProvider == nil {
+		autocompleteProvider = NewGeoapifyClientFromEnv()
+	}
+	h := &Handler{
+		Service:      service,
+		Autocomplete: autocompleteProvider,
+	}
 	// Authenticated "me" routes - user ID from JWT context
 	r.Group(func(r chi.Router) {
 		r.Use(authMiddleware)
@@ -32,6 +45,7 @@ func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Han
 		r.Post("/", h.CreateHandler)
 	})
 	r.Route("/cafes", func(r chi.Router) {
+		r.Get("/autocomplete", h.AddressAutocompleteHandler)
 		r.Get("/{id}", h.GetByIDHandler)
 		r.Group(func(r chi.Router) {
 			r.Use(authMiddleware)
@@ -39,6 +53,50 @@ func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Han
 			r.Delete("/{id}", h.DeleteHandler)
 		})
 	})
+}
+
+// AddressAutocompleteHandler godoc
+// @Summary Address autocomplete
+// @Description Returns autocomplete suggestions from Geoapify.
+// @Tags cafes
+// @Produce json
+// @Param text query string true "Partial address or place text"
+// @Param limit query int false "Max suggestions (1-10)"
+// @Success 200 {object} AddressAutocompleteResponse
+// @Failure 400 {string} string
+// @Failure 503 {string} string
+// @Failure 502 {string} string
+// @Router /cafes/autocomplete [get]
+func (h *Handler) AddressAutocompleteHandler(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("text"))
+	if query == "" {
+		http.Error(w, "Missing query parameter: text", http.StatusBadRequest)
+		return
+	}
+
+	if h.Autocomplete == nil {
+		http.Error(w, "Address autocomplete is not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	limit := defaultAutocompleteLimit
+	if limitStr := strings.TrimSpace(r.URL.Query().Get("limit")); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			http.Error(w, "Invalid limit", http.StatusBadRequest)
+			return
+		}
+		limit = parsed
+	}
+
+	results, err := h.Autocomplete.Autocomplete(r.Context(), query, limit)
+	if err != nil {
+		http.Error(w, "Failed to fetch address suggestions", http.StatusBadGateway)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(AddressAutocompleteResponse{Results: results})
 }
 
 // GetByIDHandler godoc

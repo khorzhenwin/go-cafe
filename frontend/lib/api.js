@@ -65,6 +65,13 @@ export function createMyCafe(token, body) {
   });
 }
 
+export function searchCafeAddresses(query, limit = 5) {
+  const params = new URLSearchParams();
+  params.set("text", query);
+  params.set("limit", String(limit));
+  return request(`/cafes/autocomplete?${params.toString()}`);
+}
+
 export function listMyRatings(token) {
   return request("/me/ratings", {
     headers: { Authorization: `Bearer ${token}` }
