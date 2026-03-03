@@ -12,6 +12,23 @@ help:
 run:
 	@echo "Starting backend (:8080) and frontend (:3000)..."
 	@cd backend && go run ./cmd/api & BACK_PID=$$!; \
+	for i in {1..60}; do \
+		if (echo > /dev/tcp/127.0.0.1/8080) >/dev/null 2>&1; then \
+			break; \
+		fi; \
+		if ! kill -0 $$BACK_PID 2>/dev/null; then \
+			echo "Backend process exited before becoming ready."; \
+			wait $$BACK_PID; \
+			exit $$?; \
+		fi; \
+		sleep 0.5; \
+	done; \
+	if ! (echo > /dev/tcp/127.0.0.1/8080) >/dev/null 2>&1; then \
+		echo "Timed out waiting for backend on :8080"; \
+		kill $$BACK_PID 2>/dev/null || true; \
+		wait $$BACK_PID 2>/dev/null || true; \
+		exit 1; \
+	fi; \
 	$(MAKE) -C frontend run-frontend-helper & FRONT_PID=$$!; \
 	trap 'kill $$BACK_PID $$FRONT_PID 2>/dev/null || true' INT TERM EXIT; \
 	while kill -0 $$BACK_PID 2>/dev/null && kill -0 $$FRONT_PID 2>/dev/null; do sleep 1; done; \

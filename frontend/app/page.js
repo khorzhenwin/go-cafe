@@ -10,6 +10,7 @@ import {
   listMyRatings,
   loginUser,
   registerUser,
+  searchCafeAddresses,
   updateCafe
 } from "@/lib/api";
 
@@ -29,6 +30,8 @@ export default function HomePage() {
 
   const [cafeName, setCafeName] = useState("");
   const [cafeAddress, setCafeAddress] = useState("");
+  const [addressSuggestions, setAddressSuggestions] = useState([]);
+  const [isAddressLoading, setIsAddressLoading] = useState(false);
   const [cafeDescription, setCafeDescription] = useState("");
   const [newCafeStatus, setNewCafeStatus] = useState("to_visit");
 
@@ -66,6 +69,39 @@ export default function HomePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sortBy]);
+
+  useEffect(() => {
+    const query = cafeAddress.trim();
+    if (!isAuthed || query.length < 3) {
+      setAddressSuggestions([]);
+      setIsAddressLoading(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setIsAddressLoading(true);
+      try {
+        const payload = await searchCafeAddresses(query, 5);
+        if (!cancelled) {
+          setAddressSuggestions(payload?.results || []);
+        }
+      } catch {
+        if (!cancelled) {
+          setAddressSuggestions([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsAddressLoading(false);
+        }
+      }
+    }, 2000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [cafeAddress, isAuthed]);
 
   async function handleRegister() {
     setError("");
@@ -135,6 +171,7 @@ export default function HomePage() {
       });
       setCafeName("");
       setCafeAddress("");
+      setAddressSuggestions([]);
       setCafeDescription("");
       setNewCafeStatus("to_visit");
       setMessage("Cafe listing created.");
@@ -232,6 +269,15 @@ export default function HomePage() {
     e.preventDefault();
     if (authMode === "signup") await handleRegister();
     else await handleLogin();
+  }
+
+  function handleSelectSuggestion(suggestion) {
+    const selectedAddress = suggestion.formatted || suggestion.address_line1 || suggestion.name || "";
+    setCafeAddress(selectedAddress);
+    if (!cafeName.trim() && suggestion.name) {
+      setCafeName(suggestion.name);
+    }
+    setAddressSuggestions([]);
   }
 
   return (
@@ -349,6 +395,22 @@ export default function HomePage() {
                 <label>
                   Address
                   <input value={cafeAddress} onChange={(e) => setCafeAddress(e.target.value)} />
+                  {isAddressLoading ? <p className="muted">Searching addresses...</p> : null}
+                  {addressSuggestions.length > 0 ? (
+                    <div className="autocomplete-list">
+                      {addressSuggestions.map((suggestion, index) => (
+                        <button
+                          key={`${suggestion.formatted || suggestion.name || "addr"}-${index}`}
+                          type="button"
+                          className="autocomplete-item"
+                          onClick={() => handleSelectSuggestion(suggestion)}
+                        >
+                          <strong>{suggestion.name || suggestion.address_line1 || "Suggestion"}</strong>
+                          <span>{suggestion.formatted || suggestion.address_line2 || ""}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                 </label>
                 <label>
                   Initial status

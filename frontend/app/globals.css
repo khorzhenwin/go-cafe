@@ -111,6 +111,42 @@ textarea {
   resize: vertical;
 }
 
+.autocomplete-list {
+  margin-top: 0.5rem;
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.9);
+  overflow: hidden;
+}
+
+.autocomplete-item {
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #0f172a;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.autocomplete-item + .autocomplete-item {
+  border-top: 1px dashed rgba(148, 163, 184, 0.4);
+}
+
+.autocomplete-item:hover {
+  transform: none;
+  background: rgba(2, 132, 199, 0.08);
+}
+
+.autocomplete-item span {
+  color: #475569;
+  font-size: 0.84rem;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;

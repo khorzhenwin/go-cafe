@@ -16,14 +16,24 @@ import (
 
 // Config holds server and API config.
 type Config struct {
-	BasePath    string
-	Address     string
+	BasePath     string
+	Address      string
 	WriteTimeout time.Duration
 	ReadTimeout  time.Duration
 }
 
 // New builds the HTTP handler from DB connection and configs. Caller must run migrations separately.
 func New(dbConn *gorm.DB, authCfg *appconfig.AuthConfig, srvCfg Config) http.Handler {
+	return NewWithDependencies(dbConn, authCfg, srvCfg, nil)
+}
+
+// NewWithDependencies builds the HTTP handler with explicit injected dependencies.
+func NewWithDependencies(
+	dbConn *gorm.DB,
+	authCfg *appconfig.AuthConfig,
+	srvCfg Config,
+	autocompleteProvider cafelisting.AddressAutocompleteProvider,
+) http.Handler {
 	userRepo := user.NewRepository(dbConn)
 	userSvc := user.NewService(userRepo)
 	cafeRepo := cafelisting.NewRepository(dbConn)
@@ -39,7 +49,7 @@ func New(dbConn *gorm.DB, authCfg *appconfig.AuthConfig, srvCfg Config) http.Han
 	r.Route(srvCfg.BasePath, func(r chi.Router) {
 		auth.RegisterRoutes(r, authHandler)
 		user.RegisterRoutes(r, userSvc)
-		cafelisting.RegisterRoutes(r, cafeSvc, authMiddleware)
+		cafelisting.RegisterRoutes(r, cafeSvc, authMiddleware, autocompleteProvider)
 		rating.RegisterRoutes(r, ratingSvc, authMiddleware)
 	})
 	return r

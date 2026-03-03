@@ -24,8 +24,10 @@ When updating:
 
 ```text
 go-cafe/
+  Makefile    # Root orchestration helpers (run both apps, teardown)
   backend/    # Go API server, migrations, tests, Docker assets
-  frontend/   # Next.js frontend app (Vercel-ready)
+  frontend/   # Next.js frontend app
+  docs/       # Shared documentation assets
 ```
 
 ## Current architecture
@@ -37,6 +39,7 @@ go-cafe/
 - ORM and DB layer: `gorm` + PostgreSQL driver
 - Auth: JWT (`HS256`) with middleware-based route protection
 - Migrations: `golang-migrate` (SQL files in `backend/migrations`)
+- API docs: Swagger UI exposed at `/swagger/*`
 
 Layering used in backend packages:
 
@@ -54,12 +57,11 @@ Flow:
 ### Frontend (implemented)
 
 - Framework/runtime: Next.js (App Router), React
-- Deployment target: Vercel
 - Current app scope:
   - Signup/login experience
-  - Create, edit, delete, and sort cafe listings
-  - Create, edit, and delete cafe reviews
-  - Listing cards enriched with average rating and review count
+  - Step-based journey flow: add cafe -> update visit status -> rate visited cafe
+  - Create, edit status, delete, filter, and sort cafe listings
+  - Create and delete cafe reviews
 - API client location: `frontend/lib/api.js`
 - Proxy route to backend API: `frontend/app/api/backend/[...path]/route.js`
 - Environment files:
@@ -77,7 +79,8 @@ Auth:
 - Frontend should send `Authorization: Bearer <token>` for protected endpoints.
 - Protected endpoints return `401` when token is missing/invalid.
 - User-scoped endpoints can return `403` when authenticated user does not own the resource.
-- Frontend reads backend base URL from `NEXT_PUBLIC_API_BASE_URL`.
+- Next.js proxy resolves backend base URL from `API_BASE_URL`, then `NEXT_PUBLIC_API_BASE_URL`, then `http://localhost:8080`.
+- Frontend browser calls `/api/backend/*` and Next.js forwards to backend `/api/v1/*`.
 
 ### Auth endpoints
 
@@ -119,6 +122,7 @@ Cafe status rules:
 - Default on create: `to_visit`.
 - Ratings can only be created for cafes marked `visited`.
 - Invalid status values return `400`.
+- Rating create returns `400` with message `cafe must be marked visited before rating` when status is `to_visit`.
 
 Cafe sort options (`sort` query):
 
@@ -172,6 +176,13 @@ Current schema (from `000001_create_gocafe_tables.up.sql`):
   - `cafe_listing_id` (FK -> `gocafe_cafe_listings.id`, cascade delete)
   - `visited_at` (required), `rating` (required), `review`
 
+Additional migration:
+
+- `000002_add_visit_status_to_cafe_listings.up.sql`
+  - Adds `visit_status` column to `gocafe_cafe_listings`
+  - Adds status check constraint (`to_visit`, `visited`)
+  - Adds index on `visit_status`
+
 Indexes:
 
 - `gocafe_users.email`
@@ -205,10 +216,11 @@ Reference template: `backend/.env.example`
 
 Frontend env vars (`frontend/.env`):
 
-- `API_BASE_URL` (required for Next.js server-side proxy route)
+- `API_BASE_URL` (primary value for Next.js server-side proxy route)
   - Local backend via Docker: `http://localhost:8080`
   - Production backend: `https://<your-backend-domain>`
-- `NEXT_PUBLIC_API_BASE_URL` (optional fallback)
+- `NEXT_PUBLIC_API_BASE_URL` (fallback if `API_BASE_URL` is not set)
+- If both are unset, frontend proxy defaults to `http://localhost:8080`.
 
 Vercel setup:
 
@@ -223,6 +235,9 @@ From repository root:
 make run
 
 # or run services separately
+make help
+make run-backend
+make run-frontend
 make -C backend help
 make -C backend migrate-up
 make -C backend run
@@ -307,3 +322,4 @@ For any PR that changes behavior across backend/frontend:
 - `2026-02-16`: Reworked frontend into a product-style flow (signup/login, listings CRUD + sorting, review CRUD) and switched API calls through a Next.js proxy route for Vercel compatibility.
 - `2026-02-17`: Enhanced frontend visual design with interactive 3D-style motion accents including a spinning teacup and animated ambient elements.
 - `2026-02-18`: Added cafe `visit_status` (`to_visit`/`visited`), status-aware cafe filtering/sorting, and backend rule that ratings are allowed only for visited cafes.
+- `2026-02-16`: Synced README to latest monorepo state (root Makefile orchestration, Swagger endpoint, frontend proxy behavior, and migration `000002` details).

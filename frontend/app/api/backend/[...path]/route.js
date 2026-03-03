@@ -16,12 +16,28 @@ async function forward(request, paramsPromise) {
   const hasBody = !["GET", "HEAD"].includes(method);
   const body = hasBody ? await request.arrayBuffer() : undefined;
 
-  const upstream = await fetch(url, {
-    method,
-    headers,
-    body,
-    cache: "no-store"
-  });
+  let upstream;
+  try {
+    upstream = await fetch(url, {
+      method,
+      headers,
+      body,
+      cache: "no-store"
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown upstream error";
+    return new Response(
+      JSON.stringify({
+        error: "Backend is unavailable",
+        backend_url: BACKEND_BASE_URL,
+        detail: errorMessage
+      }),
+      {
+        status: 502,
+        headers: { "content-type": "application/json; charset=utf-8" }
+      }
+    );
+  }
 
   const text = await upstream.text();
   return new Response(text, {
