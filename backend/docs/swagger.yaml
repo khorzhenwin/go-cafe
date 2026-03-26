@@ -23,9 +23,41 @@ definitions:
       token:
         type: string
     type: object
+  cafelisting.AddressAutocompleteResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/cafelisting.AddressSuggestion'
+        type: array
+    type: object
+  cafelisting.AddressSuggestion:
+    properties:
+      address_line1:
+        type: string
+      address_line2:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      formatted:
+        type: string
+      lat:
+        type: number
+      lon:
+        type: number
+      name:
+        type: string
+      postcode:
+        type: string
+    type: object
   models.CafeListing:
     properties:
       address:
+        type: string
+      avg_rating:
+        type: number
+      city:
         type: string
       created_at:
         type: string
@@ -33,8 +65,20 @@ definitions:
         type: string
       id:
         type: integer
+      image_url:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
       name:
         type: string
+      neighborhood:
+        type: string
+      review_count:
+        type: integer
+      source_cafe_id:
+        type: integer
       updated_at:
         type: string
       user:
@@ -160,6 +204,46 @@ paths:
       summary: Register user
       tags:
       - auth
+  /cafes:
+    get:
+      description: Returns public community-submitted cafes for discovery surfaces.
+      parameters:
+      - description: Search query
+        in: query
+        name: query
+        type: string
+      - description: City filter
+        in: query
+        name: city
+        type: string
+      - description: 'Sort: rating_desc|newest|name_asc'
+        in: query
+        name: sort
+        type: string
+      - description: Result limit (1-60)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.CafeListing'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Discover cafes
+      tags:
+      - cafes
   /cafes/{id}:
     delete:
       description: Deletes a cafe listing by ID.
@@ -352,6 +436,41 @@ paths:
       summary: Create rating
       tags:
       - ratings
+  /cafes/autocomplete:
+    get:
+      description: Returns autocomplete suggestions from Geoapify.
+      parameters:
+      - description: Partial address or place text
+        in: query
+        name: text
+        required: true
+        type: string
+      - description: Max suggestions (1-10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cafelisting.AddressAutocompleteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable
+          schema:
+            type: string
+      summary: Address autocomplete
+      tags:
+      - cafes
   /me/cafes:
     get:
       description: Returns cafe listings owned by the authenticated user.

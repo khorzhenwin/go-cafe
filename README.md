@@ -58,12 +58,17 @@ Flow:
 
 - Framework/runtime: Next.js (App Router), React
 - Current app scope:
-  - Signup/login experience
-  - Step-based journey flow: add cafe -> update visit status -> rate visited cafe
-  - Create, edit status, delete, filter, and sort cafe listings
-  - Create and delete cafe reviews
-- API client location: `frontend/lib/api.js`
+  - Discovery-first landing page at `/`
+  - Map-based public browsing at `/map`
+  - Cafe detail pages at `/cafes/[id]`
+  - Personal saved/visited collection at `/my-places`
+  - Review writing/history at `/reviews`
+  - Dedicated auth screen at `/auth`
+- API client location: `frontend/lib/api/` with a compatibility export at `frontend/lib/api.js`
 - Proxy route to backend API: `frontend/app/api/backend/[...path]/route.js`
+- Validation config:
+  - ESLint flat config at `frontend/eslint.config.mjs`
+  - Frontend lint command: `cd frontend && npm run lint`
 - Environment files:
   - `frontend/.env`
   - `frontend/.env.example`
@@ -99,13 +104,15 @@ Auth:
 - `PUT /api/v1/users/{id}`
 - `DELETE /api/v1/users/{id}`
 
-Note: User CRUD routes are currently not protected by JWT middleware in route wiring. If this changes, update this section and frontend assumptions.
+Note: User CRUD routes are now protected by JWT middleware in route wiring.
 
 ### Cafe listing endpoints
 
 Public:
 
+- `GET /api/v1/cafes` (supports query: `query`, `city`, `sort`, `limit`)
 - `GET /api/v1/cafes/{id}`
+- `GET /api/v1/cafes/autocomplete`
 
 Protected:
 
@@ -120,9 +127,13 @@ Cafe status rules:
 
 - `visit_status` values: `to_visit`, `visited`.
 - Default on create: `to_visit`.
+- Discovery surfaces treat `to_visit` as the user-facing "saved" state.
 - Ratings can only be created for cafes marked `visited`.
 - Invalid status values return `400`.
 - Rating create returns `400` with message `cafe must be marked visited before rating` when status is `to_visit`.
+- `POST /api/v1/me/cafes` accepts discovery metadata fields: `city`, `neighborhood`, `image_url`, `latitude`, `longitude`.
+- `POST /api/v1/me/cafes` can accept `source_cafe_id` when saving a public discovery into a personal collection.
+- Public discovery responses include derived `avg_rating` and `review_count`.
 
 Cafe sort options (`sort` query):
 
@@ -132,6 +143,12 @@ Cafe sort options (`sort` query):
 - `name_desc`
 - `status_asc`
 - `status_desc`
+
+Public discovery sort options (`GET /api/v1/cafes`):
+
+- `rating_desc` (default)
+- `newest`
+- `name_asc`
 
 ### Rating endpoints
 
@@ -151,6 +168,9 @@ Protected:
 Rating creation rule:
 
 - `POST /api/v1/cafes/{id}/ratings/` returns `400` if the cafe is still `to_visit`.
+- `POST /api/v1/cafes/{id}/ratings/` returns `400` if `rating` is outside `1-5`.
+- `POST /api/v1/cafes/{id}/ratings/` returns `409` when the same user already reviewed the same cafe.
+- `GET /api/v1/cafes/{id}/ratings/` returns community ratings for the root discovery cafe and any saved copies linked by `source_cafe_id`.
 
 ## Database requirements
 
@@ -158,7 +178,7 @@ Database: PostgreSQL
 
 Tables are managed by SQL migrations (not auto-migration at runtime).
 
-Current schema (from `000001_create_gocafe_tables.up.sql`):
+Current schema (base tables from `000001_create_gocafe_tables.up.sql` plus later migrations):
 
 - `gocafe_users`
   - `id` (PK), `created_at`, `updated_at`
@@ -168,13 +188,15 @@ Current schema (from `000001_create_gocafe_tables.up.sql`):
 - `gocafe_cafe_listings`
   - `id` (PK), `created_at`, `updated_at`
   - `user_id` (FK -> `gocafe_users.id`, cascade delete)
-  - `name` (required), `address`, `description`
+  - `name` (required), `address`, `city`, `neighborhood`, `description`, `image_url`
+  - `latitude`, `longitude`
   - `visit_status` (required; `to_visit` or `visited`; default `to_visit`)
+  - `source_cafe_id` (nullable self-reference for personal saved copies of public discoveries)
 - `gocafe_ratings`
   - `id` (PK), `created_at`, `updated_at`
   - `user_id` (FK -> `gocafe_users.id`, cascade delete)
   - `cafe_listing_id` (FK -> `gocafe_cafe_listings.id`, cascade delete)
-  - `visited_at` (required), `rating` (required), `review`
+  - `visited_at` (required), `rating` (required, 1-5), `review`
 
 Additional migration:
 
@@ -182,11 +204,20 @@ Additional migration:
   - Adds `visit_status` column to `gocafe_cafe_listings`
   - Adds status check constraint (`to_visit`, `visited`)
   - Adds index on `visit_status`
+- `000003_add_address_to_cafe_listings.up.sql`
+  - Adds `address` column to `gocafe_cafe_listings`
+- `000004_add_discovery_fields_and_rating_guardrails.up.sql`
+  - Adds `city`, `neighborhood`, `latitude`, `longitude`, `image_url`, and `source_cafe_id`
+  - Adds a self-referential FK for `source_cafe_id`
+  - Adds index support for discovery filtering
+  - Adds a rating range check (`1-5`)
 
 Indexes:
 
 - `gocafe_users.email`
 - `gocafe_cafe_listings.user_id`
+- `gocafe_cafe_listings.city`
+- `gocafe_cafe_listings.source_cafe_id`
 - `gocafe_cafe_listings.visit_status`
 - `gocafe_ratings.user_id`
 - `gocafe_ratings.cafe_listing_id`
@@ -197,6 +228,8 @@ Indexes:
 - Date/time fields are serialized as RFC3339 timestamps in JSON.
 - Ownership is enforced server-side for update/delete of cafes and ratings.
 - Password hash is never exposed in API JSON.
+- Discovery cards may include `avg_rating` and `review_count`.
+- Public discoveries are original cafes (`source_cafe_id == null`); personal saved copies may point back to the original via `source_cafe_id`.
 
 ## Environment requirements
 
@@ -239,11 +272,15 @@ make help
 make run-backend
 make run-frontend
 make -C backend help
-make -C backend migrate-up
 make -C backend run
 cd frontend && npm install
 cd frontend && npm run dev
 ```
+
+Notes:
+
+- `make run` / `make up` now starts the backend through `make -C backend run`, which applies pending backend migrations before booting the API.
+- `make teardown` / `make down` stops the local frontend/backend processes and removes generated artifacts.
 
 Common backend targets:
 
@@ -260,6 +297,7 @@ Common backend targets:
 Common frontend commands:
 
 - `cd frontend && npm run dev`
+- `cd frontend && npm run lint`
 - `cd frontend && npm run build`
 - `cd frontend && npm run start`
 
@@ -275,8 +313,8 @@ Prerequisites:
 Core persistence checks (POST -> GET, PUT -> GET, DELETE -> GET):
 
 - Auth: register + login return JWT.
-- Users: create, read by id, list, update, delete.
-- Cafes: create under `/me/cafes`, list under `/me/cafes`, get by id, update/delete owner-only.
+- Users: protected CRUD routes require JWT.
+- Cafes: public discovery list under `/cafes`, create under `/me/cafes`, list under `/me/cafes`, get by id, update/delete owner-only.
 - Ratings: create under `/cafes/{id}/ratings/`, list by cafe, get by id, update/delete owner-only.
 - User-scoped legacy routes: `/users/{userId}/cafes/` and `/users/{userId}/ratings/`.
 
@@ -298,11 +336,14 @@ make -C backend auth
 curl -s -X POST http://localhost:8080/api/v1/me/cafes \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Smoke Cafe","address":"123 Test","description":"smoke"}'
+  -d '{"name":"Smoke Cafe","address":"123 Test","city":"Seattle","description":"smoke","latitude":47.6205,"longitude":-122.3493}'
 
 # list my cafes (verify stored values)
 curl -s http://localhost:8080/api/v1/me/cafes \
   -H "Authorization: Bearer $TOKEN"
+
+# public discovery
+curl -s "http://localhost:8080/api/v1/cafes?query=smoke&sort=rating_desc"
 ```
 
 ## Definition of done for requirement changes
@@ -323,3 +364,6 @@ For any PR that changes behavior across backend/frontend:
 - `2026-02-17`: Enhanced frontend visual design with interactive 3D-style motion accents including a spinning teacup and animated ambient elements.
 - `2026-02-18`: Added cafe `visit_status` (`to_visit`/`visited`), status-aware cafe filtering/sorting, and backend rule that ratings are allowed only for visited cafes.
 - `2026-02-16`: Synced README to latest monorepo state (root Makefile orchestration, Swagger endpoint, frontend proxy behavior, and migration `000002` details).
+- `2026-03-26`: Repositioned the product around discovery-first browsing with dedicated landing, map, auth, saved places, review, and cafe detail routes.
+- `2026-03-26`: Added public discovery APIs, discovery metadata fields on cafes, `source_cafe_id` support for saved copies, and rating guardrails.
+- `2026-03-26`: Updated local validation guidance to use ESLint in the frontend and auto-apply backend migrations during root `make run` startup.

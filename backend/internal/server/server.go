@@ -8,6 +8,7 @@ import (
 	"github.com/khorzhenwin/go-cafe/backend/internal/auth"
 	"github.com/khorzhenwin/go-cafe/backend/internal/cafelisting"
 	appconfig "github.com/khorzhenwin/go-cafe/backend/internal/config"
+	"github.com/khorzhenwin/go-cafe/backend/internal/discovery"
 	"github.com/khorzhenwin/go-cafe/backend/internal/rating"
 	"github.com/khorzhenwin/go-cafe/backend/internal/user"
 	httpSwagger "github.com/swaggo/http-swagger"
@@ -48,8 +49,9 @@ func NewWithDependencies(
 	r.Get("/swagger/*", httpSwagger.WrapHandler)
 	r.Route(srvCfg.BasePath, func(r chi.Router) {
 		auth.RegisterRoutes(r, authHandler)
-		user.RegisterRoutes(r, userSvc)
+		user.RegisterRoutes(r, userSvc, authMiddleware)
 		cafelisting.RegisterRoutes(r, cafeSvc, authMiddleware, autocompleteProvider)
+		discovery.RegisterRoutes(r, nil)
 		rating.RegisterRoutes(r, ratingSvc, authMiddleware)
 	})
 	return r

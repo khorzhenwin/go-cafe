@@ -1,6 +1,8 @@
 package cafelisting
 
 import (
+	"strings"
+
 	"github.com/khorzhenwin/go-cafe/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -15,6 +17,15 @@ func NewService(store Storage) *Service {
 
 func (s *Service) GetByID(id uint) (*models.CafeListing, error) {
 	return s.store.GetByID(id)
+}
+
+func (s *Service) ListDiscovery(query, city, sort string, limit int) ([]models.CafeListing, error) {
+	return s.store.ListDiscovery(DiscoveryFilter{
+		Query: strings.TrimSpace(query),
+		City:  strings.TrimSpace(city),
+		Sort:  strings.TrimSpace(sort),
+		Limit: limit,
+	})
 }
 
 func (s *Service) GetByUserID(userID uint) ([]models.CafeListing, error) {
@@ -36,11 +47,29 @@ func (s *Service) GetByUserIDFiltered(userID uint, visitStatus, sort string) ([]
 }
 
 func (s *Service) CreateListing(listing *models.CafeListing) error {
+	if err := sanitizeListing(listing); err != nil {
+		return err
+	}
+
 	status, err := normalizeVisitStatus(listing.VisitStatus)
 	if err != nil {
 		return err
 	}
 	listing.VisitStatus = status
+
+	if listing.SourceCafeID != nil {
+		source, err := s.store.GetByID(*listing.SourceCafeID)
+		if err != nil {
+			return err
+		}
+		if source == nil {
+			return gorm.ErrRecordNotFound
+		}
+		if source.SourceCafeID != nil {
+			listing.SourceCafeID = source.SourceCafeID
+		}
+	}
+
 	return s.store.Create(listing)
 }
 
@@ -56,7 +85,13 @@ func (s *Service) UpdateListing(id uint, userID uint, updated models.CafeListing
 	if err != nil {
 		return err
 	}
+	if err := sanitizeListing(&updated); err != nil {
+		return err
+	}
 	updated.VisitStatus = status
+	updated.SourceCafeID = existing.SourceCafeID
+	updated.SourceProvider = existing.SourceProvider
+	updated.ExternalPlaceID = existing.ExternalPlaceID
 	return s.store.Update(id, updated)
 }
 
@@ -83,4 +118,33 @@ func (s *Service) IsListingVisited(id uint) (bool, error) {
 		return false, gorm.ErrRecordNotFound
 	}
 	return existing.VisitStatus == VisitStatusVisited, nil
+}
+
+func sanitizeListing(listing *models.CafeListing) error {
+	listing.Name = strings.TrimSpace(listing.Name)
+	listing.Address = strings.TrimSpace(listing.Address)
+	listing.City = strings.TrimSpace(listing.City)
+	listing.Neighborhood = strings.TrimSpace(listing.Neighborhood)
+	listing.Description = strings.TrimSpace(listing.Description)
+	listing.ImageURL = strings.TrimSpace(listing.ImageURL)
+	listing.SourceProvider = strings.TrimSpace(listing.SourceProvider)
+	listing.ExternalPlaceID = strings.TrimSpace(listing.ExternalPlaceID)
+
+	if listing.Name == "" {
+		return ErrInvalidCafeName
+	}
+
+	if (listing.Latitude == nil) != (listing.Longitude == nil) {
+		return ErrInvalidCoordinates
+	}
+
+	if listing.Latitude != nil && (*listing.Latitude < -90 || *listing.Latitude > 90) {
+		return ErrInvalidCoordinates
+	}
+
+	if listing.Longitude != nil && (*listing.Longitude < -180 || *listing.Longitude > 180) {
+		return ErrInvalidCoordinates
+	}
+
+	return nil
 }

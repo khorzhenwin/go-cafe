@@ -106,6 +106,120 @@
                 }
             }
         },
+        "/cafes": {
+            "get": {
+                "description": "Returns public community-submitted cafes for discovery surfaces.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "cafes"
+                ],
+                "summary": "Discover cafes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "query",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "City filter",
+                        "name": "city",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Sort: rating_desc|newest|name_asc",
+                        "name": "sort",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Result limit (1-60)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.CafeListing"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/cafes/autocomplete": {
+            "get": {
+                "description": "Returns autocomplete suggestions from Geoapify.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "cafes"
+                ],
+                "summary": "Address autocomplete",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Partial address or place text",
+                        "name": "text",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Max suggestions (1-10)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/cafelisting.AddressAutocompleteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/cafes/{id}": {
             "get": {
                 "description": "Returns a cafe listing by ID.",
@@ -1195,10 +1309,59 @@
                 }
             }
         },
+        "cafelisting.AddressAutocompleteResponse": {
+            "type": "object",
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/cafelisting.AddressSuggestion"
+                    }
+                }
+            }
+        },
+        "cafelisting.AddressSuggestion": {
+            "type": "object",
+            "properties": {
+                "address_line1": {
+                    "type": "string"
+                },
+                "address_line2": {
+                    "type": "string"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "country": {
+                    "type": "string"
+                },
+                "formatted": {
+                    "type": "string"
+                },
+                "lat": {
+                    "type": "number"
+                },
+                "lon": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "postcode": {
+                    "type": "string"
+                }
+            }
+        },
         "models.CafeListing": {
             "type": "object",
             "properties": {
                 "address": {
+                    "type": "string"
+                },
+                "avg_rating": {
+                    "type": "number"
+                },
+                "city": {
                     "type": "string"
                 },
                 "created_at": {
@@ -1210,8 +1373,26 @@
                 "id": {
                     "type": "integer"
                 },
+                "image_url": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
                 "name": {
                     "type": "string"
+                },
+                "neighborhood": {
+                    "type": "string"
+                },
+                "review_count": {
+                    "type": "integer"
+                },
+                "source_cafe_id": {
+                    "type": "integer"
                 },
                 "updated_at": {
                     "type": "string"

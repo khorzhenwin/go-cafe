@@ -45,6 +45,7 @@ func RegisterRoutes(
 		r.Post("/", h.CreateHandler)
 	})
 	r.Route("/cafes", func(r chi.Router) {
+		r.Get("/", h.ListDiscoveryHandler)
 		r.Get("/autocomplete", h.AddressAutocompleteHandler)
 		r.Get("/{id}", h.GetByIDHandler)
 		r.Group(func(r chi.Router) {
@@ -53,6 +54,45 @@ func RegisterRoutes(
 			r.Delete("/{id}", h.DeleteHandler)
 		})
 	})
+}
+
+// ListDiscoveryHandler godoc
+// @Summary Discover cafes
+// @Description Returns public community-submitted cafes for discovery surfaces.
+// @Tags cafes
+// @Produce json
+// @Param query query string false "Search query"
+// @Param city query string false "City filter"
+// @Param sort query string false "Sort: rating_desc|newest|name_asc"
+// @Param limit query int false "Result limit (1-60)"
+// @Success 200 {array} models.CafeListing
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /cafes [get]
+func (h *Handler) ListDiscoveryHandler(w http.ResponseWriter, r *http.Request) {
+	limit := 18
+	if limitStr := strings.TrimSpace(r.URL.Query().Get("limit")); limitStr != "" {
+		parsed, err := strconv.Atoi(limitStr)
+		if err != nil {
+			http.Error(w, "Invalid limit", http.StatusBadRequest)
+			return
+		}
+		limit = parsed
+	}
+
+	listings, err := h.Service.ListDiscovery(
+		r.URL.Query().Get("query"),
+		r.URL.Query().Get("city"),
+		r.URL.Query().Get("sort"),
+		limit,
+	)
+	if err != nil {
+		http.Error(w, "Failed to retrieve cafes", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(listings)
 }
 
 // AddressAutocompleteHandler godoc
@@ -191,8 +231,12 @@ func (h *Handler) CreateMyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	listing.UserID = userID
 	if err := h.Service.CreateListing(&listing); err != nil {
-		if errors.Is(err, ErrInvalidVisitStatus) {
+		if errors.Is(err, ErrInvalidVisitStatus) || errors.Is(err, ErrInvalidCafeName) || errors.Is(err, ErrInvalidCoordinates) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Source cafe not found", http.StatusNotFound)
 			return
 		}
 		http.Error(w, "Failed to create cafe listing", http.StatusInternalServerError)
@@ -287,8 +331,12 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	listing.UserID = userID
 	if err := h.Service.CreateListing(&listing); err != nil {
-		if errors.Is(err, ErrInvalidVisitStatus) {
+		if errors.Is(err, ErrInvalidVisitStatus) || errors.Is(err, ErrInvalidCafeName) || errors.Is(err, ErrInvalidCoordinates) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			http.Error(w, "Source cafe not found", http.StatusNotFound)
 			return
 		}
 		http.Error(w, "Failed to create cafe listing", http.StatusInternalServerError)
@@ -336,7 +384,7 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
 			return
 		}
-		if errors.Is(err, ErrInvalidVisitStatus) {
+		if errors.Is(err, ErrInvalidVisitStatus) || errors.Is(err, ErrInvalidCafeName) || errors.Is(err, ErrInvalidCoordinates) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

@@ -1,626 +1,176 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import {
-  createCafeRating,
-  createMyCafe,
-  deleteCafe,
-  deleteRating,
-  listMyCafes,
-  listMyRatings,
-  loginUser,
-  registerUser,
-  searchCafeAddresses,
-  updateCafe
-} from "@/lib/api";
+import AppShell from "@/components/app-shell";
+import CafeCard from "@/components/cafe-card";
+import CafeMap from "@/components/cafe-map";
+import { useAuth } from "@/components/providers/auth-provider";
+import { listDiscoveryCafes } from "@/lib/api";
+
+const BENEFITS = [
+  "Browse real cafes from Google instead of relying on seeded shared database content.",
+  "Save interesting places into a personal shortlist for later visits.",
+  "Turn visits into reviews without losing the discovery context."
+];
 
 export default function HomePage() {
-  const [authMode, setAuthMode] = useState("signup");
-  const [email, setEmail] = useState("");
-  const [name, setName] = useState("");
-  const [password, setPassword] = useState("");
-  const [token, setToken] = useState("");
-  const [error, setError] = useState("");
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(false);
-
+  const { isAuthed } = useAuth();
   const [cafes, setCafes] = useState([]);
-  const [ratings, setRatings] = useState([]);
-  const [pendingStatusById, setPendingStatusById] = useState({});
-
-  const [cafeName, setCafeName] = useState("");
-  const [cafeAddress, setCafeAddress] = useState("");
-  const [addressSuggestions, setAddressSuggestions] = useState([]);
-  const [isAddressLoading, setIsAddressLoading] = useState(false);
-  const [cafeDescription, setCafeDescription] = useState("");
-  const [newCafeStatus, setNewCafeStatus] = useState("to_visit");
-
-  const [selectedCafeId, setSelectedCafeId] = useState("");
-  const [reviewRating, setReviewRating] = useState("5");
-  const [reviewText, setReviewText] = useState("");
-
-  const [sortBy, setSortBy] = useState("updated_desc");
-  const [activeStep, setActiveStep] = useState(1);
-
-  const isAuthed = useMemo(() => token.trim().length > 0, [token]);
-  const toVisitCafes = useMemo(() => cafes.filter((c) => c.visit_status === "to_visit"), [cafes]);
-  const visitedCafes = useMemo(() => cafes.filter((c) => c.visit_status === "visited"), [cafes]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selectedCafe, setSelectedCafe] = useState(null);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("go-cafe-token");
-    if (saved) setToken(saved);
-  }, []);
-
-  useEffect(() => {
-    if (token) window.localStorage.setItem("go-cafe-token", token);
-    else window.localStorage.removeItem("go-cafe-token");
-  }, [token]);
-
-  useEffect(() => {
-    if (isAuthed) {
-      handleRefreshData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthed]);
-
-  useEffect(() => {
-    if (isAuthed) {
-      handleRefreshData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sortBy]);
-
-  useEffect(() => {
-    const query = cafeAddress.trim();
-    if (!isAuthed || query.length < 3) {
-      setAddressSuggestions([]);
-      setIsAddressLoading(false);
-      return undefined;
-    }
-
     let cancelled = false;
-    const timer = setTimeout(async () => {
-      setIsAddressLoading(true);
+
+    async function load() {
+      setLoading(true);
+      setError("");
+
       try {
-        const payload = await searchCafeAddresses(query, 5);
+        const payload = await listDiscoveryCafes({ city: "Singapore", limit: 6 });
         if (!cancelled) {
-          setAddressSuggestions(payload?.results || []);
+          setCafes(payload || []);
+          setSelectedCafe(payload?.[0] || null);
         }
-      } catch {
+      } catch (loadError) {
         if (!cancelled) {
-          setAddressSuggestions([]);
+          setError(loadError.message);
         }
       } finally {
         if (!cancelled) {
-          setIsAddressLoading(false);
+          setLoading(false);
         }
       }
-    }, 2000);
+    }
+
+    load();
 
     return () => {
       cancelled = true;
-      clearTimeout(timer);
     };
-  }, [cafeAddress, isAuthed]);
+  }, []);
 
-  async function handleRegister() {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      const response = await registerUser({ email, name, password });
-      setToken(response.token || "");
-      setMessage("Signed up successfully.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleLogin() {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      const response = await loginUser({ email, password });
-      setToken(response.token || "");
-      setMessage("Logged in successfully.");
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleRefreshData() {
-    if (!isAuthed) return;
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      const [myCafes, myRatings] = await Promise.all([listMyCafes(token, { sort: sortBy }), listMyRatings(token)]);
-      const cafesData = myCafes || [];
-      setCafes(cafesData);
-      setRatings(myRatings || []);
-      setSelectedCafeId((prev) => prev || String(cafesData[0]?.id || ""));
-      setPendingStatusById(
-        cafesData.reduce((acc, cafe) => {
-          acc[cafe.id] = cafe.visit_status || "to_visit";
-          return acc;
-        }, {})
-      );
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleCreateCafe() {
-    if (!isAuthed) return;
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      await createMyCafe(token, {
-        name: cafeName,
-        address: cafeAddress,
-        description: cafeDescription,
-        visit_status: newCafeStatus
-      });
-      setCafeName("");
-      setCafeAddress("");
-      setAddressSuggestions([]);
-      setCafeDescription("");
-      setNewCafeStatus("to_visit");
-      setMessage("Cafe listing created.");
-      await handleRefreshData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleUpdateCafeStatus(cafe) {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      await updateCafe(token, cafe.id, {
-        name: cafe.name,
-        address: cafe.address,
-        description: cafe.description,
-        visit_status: pendingStatusById[cafe.id] || cafe.visit_status
-      });
-      setMessage("Cafe status updated.");
-      await handleRefreshData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDeleteCafe(cafeId) {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      await deleteCafe(token, cafeId);
-      if (String(cafeId) === String(selectedCafeId)) setSelectedCafeId("");
-      setMessage("Cafe listing deleted.");
-      await handleRefreshData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleCreateReview() {
-    if (!selectedCafeId) return;
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      await createCafeRating(token, selectedCafeId, {
-        visited_at: new Date().toISOString(),
-        rating: Number(reviewRating),
-        review: reviewText
-      });
-      setReviewText("");
-      setReviewRating("5");
-      setMessage("Review added.");
-      await handleRefreshData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleDeleteRating(ratingId) {
-    setError("");
-    setMessage("");
-    setLoading(true);
-    try {
-      await deleteRating(token, ratingId);
-      setMessage("Review deleted.");
-      await handleRefreshData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleLogout() {
-    setToken("");
-    setCafes([]);
-    setRatings([]);
-    setPendingStatusById({});
-    setMessage("Logged out.");
-    setError("");
-  }
-
-  async function handleAuthSubmit(e) {
-    e.preventDefault();
-    if (authMode === "signup") await handleRegister();
-    else await handleLogin();
-  }
-
-  function handleSelectSuggestion(suggestion) {
-    const selectedAddress = suggestion.formatted || suggestion.address_line1 || suggestion.name || "";
-    setCafeAddress(selectedAddress);
-    if (!cafeName.trim() && suggestion.name) {
-      setCafeName(suggestion.name);
-    }
-    setAddressSuggestions([]);
-  }
+  const stats = useMemo(
+    () => [
+      { label: "Community spots", value: cafes.length },
+      { label: "Mapped entries", value: cafes.filter((cafe) => cafe.latitude && cafe.longitude).length },
+      { label: "Total reviews", value: cafes.reduce((sum, cafe) => sum + (cafe.review_count || 0), 0) }
+    ],
+    [cafes]
+  );
 
   return (
-    <main className="app-shell">
-      <div className="splash-screen" aria-hidden="true">
-        <div className="vector-grid" />
-        <div className="vector-orb orb-a" />
-        <div className="vector-orb orb-b" />
-        <div className="vector-orb orb-c" />
-        <div className="vector-line line-a" />
-        <div className="vector-line line-b" />
-        <div className="vector-line line-c" />
-      </div>
-      <header className="hero">
-        <div>
-          <h1>Cafe Hub</h1>
-          <p className="muted">
-            A simple cafe journey: <strong>add cafes</strong>, <strong>mark status</strong>, then{" "}
-            <strong>rate visited cafes</strong>.
-          </p>
-        </div>
-      </header>
-
-      {!isAuthed ? (
-        <section className="flow-section">
-          <form onSubmit={handleAuthSubmit}>
-            <div className="stack-fields">
-              <label htmlFor="email">
-                Email
-                <input id="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
-              </label>
-              {authMode === "signup" ? (
-                <label htmlFor="name">
-                  Display name
-                  <input id="name" value={name} onChange={(e) => setName(e.target.value)} required />
-                </label>
-              ) : null}
-              <label htmlFor="password">
-                Password
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-              </label>
-            </div>
-            <div className="actions">
-              <button type="submit" disabled={loading}>
-                {loading ? "Please wait..." : authMode === "signup" ? "Create account" : "Login"}
-              </button>
-            </div>
-            <div className="auth-tabs auth-tabs-bottom">
-              <button className={authMode === "signup" ? "tab active" : "tab"} onClick={() => setAuthMode("signup")}>
-                Sign up
-              </button>
-              <button className={authMode === "login" ? "tab active" : "tab"} onClick={() => setAuthMode("login")}>
-                Login
-              </button>
-            </div>
-          </form>
-        </section>
-      ) : (
+    <AppShell
+      title="Discover cafes with better context"
+      subtitle="Cafe Hub now leads with discovery: browse Google-sourced cafes, understand the vibe quickly, then save the ones worth adding to your own ritual."
+      actions={
         <>
-          <section className="flow-section">
-            <div className="toolbar">
-              <h2>Journey</h2>
-              <div className="actions">
-                <button className="secondary" onClick={handleRefreshData} disabled={loading}>
-                  Refresh data
-                </button>
-                <button className="ghost" onClick={handleLogout}>
-                  Logout
-                </button>
-              </div>
-            </div>
-            <p className="muted">Follow steps in order. Reviews are available only after a cafe is marked visited.</p>
-            <div className="step-tabs" role="tablist" aria-label="Journey steps">
-              <button
-                className={activeStep === 1 ? "tab active" : "tab"}
-                onClick={() => setActiveStep(1)}
-                role="tab"
-                aria-selected={activeStep === 1}
-              >
-                Step 1 - Add cafe
-              </button>
-              <button
-                className={activeStep === 2 ? "tab active" : "tab"}
-                onClick={() => setActiveStep(2)}
-                role="tab"
-                aria-selected={activeStep === 2}
-              >
-                Step 2 - Update status
-              </button>
-              <button
-                className={activeStep === 3 ? "tab active" : "tab"}
-                onClick={() => setActiveStep(3)}
-                role="tab"
-                aria-selected={activeStep === 3}
-              >
-                Step 3 - Rate visited
-              </button>
-            </div>
-          </section>
-
-          {activeStep === 1 ? (
-            <section className="flow-section">
-              <h2>Step 1 - Add your cafe</h2>
-              <div className="stack-fields">
-                <label>
-                  Cafe name
-                  <input value={cafeName} onChange={(e) => setCafeName(e.target.value)} required />
-                </label>
-                <label>
-                  Address
-                  <input value={cafeAddress} onChange={(e) => setCafeAddress(e.target.value)} />
-                  {isAddressLoading ? <p className="muted">Searching addresses...</p> : null}
-                  {addressSuggestions.length > 0 ? (
-                    <div className="autocomplete-list">
-                      {addressSuggestions.map((suggestion, index) => (
-                        <button
-                          key={`${suggestion.formatted || suggestion.name || "addr"}-${index}`}
-                          type="button"
-                          className="autocomplete-item"
-                          onClick={() => handleSelectSuggestion(suggestion)}
-                        >
-                          <strong>{suggestion.name || suggestion.address_line1 || "Suggestion"}</strong>
-                          <span>{suggestion.formatted || suggestion.address_line2 || ""}</span>
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </label>
-                <label>
-                  Initial status
-                  <select value={newCafeStatus} onChange={(e) => setNewCafeStatus(e.target.value)} className="select">
-                    <option value="to_visit">To Visit</option>
-                    <option value="visited">Visited</option>
-                  </select>
-                </label>
-                <label>
-                  Description
-                  <textarea
-                    value={cafeDescription}
-                    onChange={(e) => setCafeDescription(e.target.value)}
-                    placeholder="Why this cafe matters to you..."
-                  />
-                </label>
-              </div>
-              <div className="actions">
-                <button onClick={handleCreateCafe} disabled={loading || !cafeName.trim()}>
-                  Add cafe
-                </button>
-                <button className="secondary" onClick={() => setActiveStep(2)} disabled={loading}>
-                  Continue to Step 2
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          {activeStep === 2 ? (
-            <section className="flow-section">
-              <div className="toolbar">
-                <h2>Step 2 - Update journey status</h2>
-                <label>
-                  Sort
-                  <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="select">
-                    <option value="updated_desc">Recently updated</option>
-                    <option value="created_desc">Newest created</option>
-                    <option value="name_asc">Name A-Z</option>
-                    <option value="name_desc">Name Z-A</option>
-                    <option value="status_asc">Status A-Z</option>
-                    <option value="status_desc">Status Z-A</option>
-                  </select>
-                </label>
-              </div>
-              <p className="muted">Mark cafes as visited before adding ratings.</p>
-              {cafes.length === 0 ? (
-                <p className="muted">No cafes yet. Complete Step 1 first.</p>
-              ) : (
-                <div className="status-layout">
-                  <div>
-                    <h3>To Visit</h3>
-                    {toVisitCafes.length === 0 ? (
-                      <p className="muted">None</p>
-                    ) : (
-                      toVisitCafes.map((cafe) => (
-                        <div key={cafe.id} className="list-row">
-                          <div>
-                            <strong>{cafe.name}</strong>
-                            <p className="muted">{cafe.address || "No address"}</p>
-                          </div>
-                          <div className="row-actions">
-                            <select
-                              className="select"
-                              value={pendingStatusById[cafe.id] || cafe.visit_status}
-                              onChange={(e) =>
-                                setPendingStatusById((prev) => ({ ...prev, [cafe.id]: e.target.value }))
-                              }
-                            >
-                              <option value="to_visit">To Visit</option>
-                              <option value="visited">Visited</option>
-                            </select>
-                            <button
-                              className="secondary"
-                              onClick={() => handleUpdateCafeStatus(cafe)}
-                              disabled={loading}
-                            >
-                              Save
-                            </button>
-                            <button className="ghost" onClick={() => handleDeleteCafe(cafe.id)} disabled={loading}>
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                  <div>
-                    <h3>Visited</h3>
-                    {visitedCafes.length === 0 ? (
-                      <p className="muted">None yet</p>
-                    ) : (
-                      visitedCafes.map((cafe) => (
-                        <div key={cafe.id} className="list-row">
-                          <div>
-                            <strong>{cafe.name}</strong>
-                            <p className="muted">{cafe.address || "No address"}</p>
-                          </div>
-                          <div className="row-actions">
-                            <select
-                              className="select"
-                              value={pendingStatusById[cafe.id] || cafe.visit_status}
-                              onChange={(e) =>
-                                setPendingStatusById((prev) => ({ ...prev, [cafe.id]: e.target.value }))
-                              }
-                            >
-                              <option value="to_visit">To Visit</option>
-                              <option value="visited">Visited</option>
-                            </select>
-                            <button
-                              className="secondary"
-                              onClick={() => handleUpdateCafeStatus(cafe)}
-                              disabled={loading}
-                            >
-                              Save
-                            </button>
-                            <button className="ghost" onClick={() => handleDeleteCafe(cafe.id)} disabled={loading}>
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-              <div className="actions">
-                <button className="ghost" onClick={() => setActiveStep(1)} disabled={loading}>
-                  Back to Step 1
-                </button>
-                <button className="secondary" onClick={() => setActiveStep(3)} disabled={loading}>
-                  Continue to Step 3
-                </button>
-              </div>
-            </section>
-          ) : null}
-
-          {activeStep === 3 ? (
-            <section className="flow-section">
-              <h2>Step 3 - Rate visited cafes</h2>
-              <div className="stack-fields">
-                <label>
-                  Cafe
-                  <select value={selectedCafeId} onChange={(e) => setSelectedCafeId(e.target.value)} className="select">
-                    <option value="">Select visited cafe</option>
-                    {visitedCafes.map((cafe) => (
-                      <option key={cafe.id} value={cafe.id}>
-                        {cafe.name} (#{cafe.id})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Rating
-                  <select value={reviewRating} onChange={(e) => setReviewRating(e.target.value)} className="select">
-                    {[5, 4, 3, 2, 1].map((score) => (
-                      <option key={score} value={score}>
-                        {score}/5
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Review
-                  <textarea
-                    value={reviewText}
-                    onChange={(e) => setReviewText(e.target.value)}
-                    placeholder="How was your visit?"
-                  />
-                </label>
-              </div>
-              <div className="actions">
-                <button onClick={handleCreateReview} disabled={loading || !selectedCafeId || visitedCafes.length === 0}>
-                  Submit review
-                </button>
-                <button className="ghost" onClick={() => setActiveStep(2)} disabled={loading}>
-                  Back to Step 2
-                </button>
-              </div>
-              {visitedCafes.length === 0 ? (
-                <p className="muted">No visited cafes yet. Complete Step 2 first.</p>
-              ) : null}
-            </section>
-          ) : null}
-
-          <section className="flow-section">
-            <h2>Recent reviews</h2>
-            {ratings.length === 0 ? (
-              <p className="muted">No reviews yet.</p>
-            ) : (
-              <div className="review-list">
-                {ratings.map((rating) => (
-                  <article key={rating.id} className="review-line">
-                    <strong>
-                      Cafe #{rating.cafe_listing_id} - {rating.rating}/5
-                    </strong>
-                    <p>{rating.review || "No review text."}</p>
-                    <button className="ghost" onClick={() => handleDeleteRating(rating.id)} disabled={loading}>
-                      Delete
-                    </button>
-                  </article>
-                ))}
-              </div>
-            )}
-          </section>
+          <Link href="/map" className="button">
+            Explore the map
+          </Link>
+          <Link href={isAuthed ? "/my-places" : "/auth"} className="button button-secondary">
+            {isAuthed ? "Open my places" : "Create an account"}
+          </Link>
         </>
-      )}
+      }
+    >
+      <section className="hero-grid">
+        <div className="surface hero-card">
+          <p className="eyebrow">Why this redesign matters</p>
+          <h2>Intent is clearer from the first screen</h2>
+          <div className="benefit-list">
+            {BENEFITS.map((benefit) => (
+              <p key={benefit}>{benefit}</p>
+            ))}
+          </div>
+          <div className="hero-actions">
+            <Link href="/map" className="button">
+              Start discovering
+            </Link>
+            <Link href="/reviews" className="button button-ghost">
+              See the journal flow
+            </Link>
+          </div>
+        </div>
 
-      {message ? <section className="flow-section success">{message}</section> : null}
-      {error ? <section className="flow-section error">{error}</section> : null}
-      {!isAuthed ? null : loading ? <p className="muted">Loading...</p> : null}
-    </main>
+        <div className="stats-grid">
+          {stats.map((item) => (
+            <article key={item.label} className="surface stat-card">
+              <strong>{item.value}</strong>
+              <span>{item.label}</span>
+            </article>
+          ))}
+          <article className="surface stat-card stat-card-highlight">
+            <strong>{cafes.length}</strong>
+            <span>Featured cafes right now</span>
+          </article>
+        </div>
+      </section>
+
+      <section className="content-grid">
+        <CafeMap
+          cafes={cafes}
+          selectedCafeId={selectedCafe?.external_place_id || selectedCafe?.id}
+          onSelect={setSelectedCafe}
+          title="Featured discovery map"
+        />
+
+        <div className="surface spotlight-card">
+          <p className="eyebrow">Selected cafe</p>
+          {selectedCafe ? (
+            <>
+              <h2>{selectedCafe.name}</h2>
+              <p className="muted">{selectedCafe.address || selectedCafe.city || "Google Places result"}</p>
+              <p className="body-copy">
+                {selectedCafe.description || "Open this cafe detail to see the full context and community notes."}
+              </p>
+              <div className="card-actions">
+                <Link href={`/cafes/${encodeURIComponent(selectedCafe.id)}`} className="button">
+                  Open cafe detail
+                </Link>
+                <Link href="/map" className="button button-secondary">
+                  Browse all cafes
+                </Link>
+              </div>
+            </>
+          ) : loading ? (
+            <p>Loading featured cafes...</p>
+          ) : (
+            <p>No public cafes yet. Add one from your personal area to populate the map.</p>
+          )}
+          {error ? <p className="feedback error">{error}</p> : null}
+        </div>
+      </section>
+
+      <section className="section-stack">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">Featured cafes</p>
+            <h2>High-signal places to start with</h2>
+          </div>
+          <Link href="/map" className="button button-secondary">
+            View full discovery list
+          </Link>
+        </div>
+
+        {loading ? <section className="surface empty-state">Loading community picks...</section> : null}
+
+        {!loading && !cafes.length ? (
+          <section className="surface empty-state">
+            Google discovery is not available right now. Set the Google Places API key to populate this view with live cafes.
+          </section>
+        ) : null}
+
+        {!loading ? (
+          <div className="card-grid">
+            {cafes.map((cafe) => (
+              <CafeCard key={cafe.id} cafe={cafe} />
+            ))}
+          </div>
+        ) : null}
+      </section>
+    </AppShell>
   );
 }

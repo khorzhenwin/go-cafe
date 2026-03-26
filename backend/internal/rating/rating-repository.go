@@ -11,7 +11,9 @@ type Storage interface {
 	Create(rating *models.Rating) error
 	GetByID(id uint) (*models.Rating, error)
 	GetByCafeListingID(cafeListingID uint) ([]models.Rating, error)
+	GetByExternalPlaceID(externalPlaceID string) ([]models.Rating, error)
 	GetByUserID(userID uint) ([]models.Rating, error)
+	FindByUserAndCafe(userID uint, cafeListingID uint) (*models.Rating, error)
 	Update(id uint, updated models.Rating) error
 	Delete(id uint) error
 }
@@ -30,7 +32,7 @@ func (r *Repository) Create(rt *models.Rating) error {
 
 func (r *Repository) GetByID(id uint) (*models.Rating, error) {
 	var rating models.Rating
-	err := r.db.First(&rating, id).Error
+	err := r.db.Preload("User").Preload("CafeListing").First(&rating, id).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, nil
 	}
@@ -38,15 +40,63 @@ func (r *Repository) GetByID(id uint) (*models.Rating, error) {
 }
 
 func (r *Repository) GetByCafeListingID(cafeListingID uint) ([]models.Rating, error) {
+	var cafe models.CafeListing
+	if err := r.db.First(&cafe, cafeListingID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return []models.Rating{}, nil
+		}
+		return nil, err
+	}
+
+	rootID := cafe.ID
+	if cafe.SourceCafeID != nil {
+		rootID = *cafe.SourceCafeID
+	}
+
+	if cafe.ExternalPlaceID != "" {
+		return r.GetByExternalPlaceID(cafe.ExternalPlaceID)
+	}
+
 	var ratings []models.Rating
-	err := r.db.Where("cafe_listing_id = ?", cafeListingID).Find(&ratings).Error
+	err := r.db.
+		Preload("User").
+		Preload("CafeListing").
+		Joins("JOIN gocafe_cafe_listings ON gocafe_cafe_listings.id = gocafe_ratings.cafe_listing_id").
+		Where("COALESCE(gocafe_cafe_listings.source_cafe_id, gocafe_cafe_listings.id) = ?", rootID).
+		Order("gocafe_ratings.visited_at DESC").
+		Find(&ratings).Error
+	return ratings, err
+}
+
+func (r *Repository) GetByExternalPlaceID(externalPlaceID string) ([]models.Rating, error) {
+	var ratings []models.Rating
+	err := r.db.
+		Preload("User").
+		Preload("CafeListing").
+		Joins("JOIN gocafe_cafe_listings ON gocafe_cafe_listings.id = gocafe_ratings.cafe_listing_id").
+		Where("gocafe_cafe_listings.external_place_id = ?", externalPlaceID).
+		Order("gocafe_ratings.visited_at DESC").
+		Find(&ratings).Error
 	return ratings, err
 }
 
 func (r *Repository) GetByUserID(userID uint) ([]models.Rating, error) {
 	var ratings []models.Rating
-	err := r.db.Where("user_id = ?", userID).Find(&ratings).Error
+	err := r.db.
+		Preload("CafeListing").
+		Where("user_id = ?", userID).
+		Order("visited_at DESC").
+		Find(&ratings).Error
 	return ratings, err
+}
+
+func (r *Repository) FindByUserAndCafe(userID uint, cafeListingID uint) (*models.Rating, error) {
+	var rating models.Rating
+	err := r.db.Where("user_id = ? AND cafe_listing_id = ?", userID, cafeListingID).First(&rating).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	return &rating, err
 }
 
 func (r *Repository) Update(id uint, updated models.Rating) error {

@@ -15,9 +15,10 @@ type Handler struct {
 	Service *Service
 }
 
-func RegisterRoutes(r chi.Router, service *Service) {
+func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Handler) http.Handler) {
 	h := &Handler{Service: service}
 	r.Route("/users", func(r chi.Router) {
+		r.Use(authMiddleware)
 		r.Get("/", h.GetAllHandler)
 		r.Post("/", h.CreateHandler)
 		r.Get("/{id}", h.GetByIDHandler)
