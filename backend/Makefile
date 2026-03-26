@@ -25,7 +25,7 @@ help:
 	@echo "  make teardown-reset  - DESTRUCTIVE: teardown + rollback one migration"
 
 run:
-	cd $(ROOT) && go run ./cmd/api
+	cd $(ROOT) && go run ./cmd/migrate up && go run ./cmd/api
 
 # Print JWT for Swagger Auth button.
 # Optional overrides:

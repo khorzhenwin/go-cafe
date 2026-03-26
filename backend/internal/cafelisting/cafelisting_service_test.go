@@ -9,12 +9,12 @@ import (
 )
 
 type mockCafeStorage struct {
-	listings    []models.CafeListing
-	getByID     *models.CafeListing
+	listings   []models.CafeListing
+	getByID    *models.CafeListing
 	getByIDErr error
-	createErr   error
-	updateErr   error
-	deleteErr   error
+	createErr  error
+	updateErr  error
+	deleteErr  error
 }
 
 func (m *mockCafeStorage) Create(c *models.CafeListing) error {
@@ -31,6 +31,10 @@ func (m *mockCafeStorage) GetByID(id uint) (*models.CafeListing, error) {
 		return nil, m.getByIDErr
 	}
 	return m.getByID, nil
+}
+
+func (m *mockCafeStorage) ListDiscovery(filter DiscoveryFilter) ([]models.CafeListing, error) {
+	return m.listings, nil
 }
 
 func (m *mockCafeStorage) GetByUserID(userID uint) ([]models.CafeListing, error) {
@@ -71,6 +75,15 @@ func TestService_CreateListing_InvalidVisitStatus(t *testing.T) {
 	listing := &models.CafeListing{UserID: 1, Name: "Cafe A", VisitStatus: "unknown"}
 	err := svc.CreateListing(listing)
 	assert.ErrorIs(t, err, ErrInvalidVisitStatus)
+}
+
+func TestService_CreateListing_InvalidCoordinates(t *testing.T) {
+	m := &mockCafeStorage{}
+	svc := NewService(m)
+	lat := 1.23
+	listing := &models.CafeListing{UserID: 1, Name: "Cafe A", Latitude: &lat}
+	err := svc.CreateListing(listing)
+	assert.ErrorIs(t, err, ErrInvalidCoordinates)
 }
 
 func TestService_UpdateListing_NotOwner(t *testing.T) {

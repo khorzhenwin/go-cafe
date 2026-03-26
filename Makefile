@@ -9,9 +9,11 @@ help:
 	@echo "  make run-frontend  - Run frontend only"
 	@echo "  make teardown      - Stop all services and clean backend/frontend artifacts"
 
-run:
+run: up
+
+up:
 	@echo "Starting backend (:8080) and frontend (:3000)..."
-	@cd backend && go run ./cmd/api & BACK_PID=$$!; \
+	@$(MAKE) -C backend run & BACK_PID=$$!; \
 	for i in {1..60}; do \
 		if (echo > /dev/tcp/127.0.0.1/8080) >/dev/null 2>&1; then \
 			break; \
@@ -47,7 +49,7 @@ run-backend:
 run-frontend:
 	@$(MAKE) -C frontend run-frontend-helper
 
-teardown:
+down:
 	@echo "Stopping local processes on :3000 and :8080 (if present)..."
 	@if command -v lsof >/dev/null 2>&1; then \
 		PIDS=$$((lsof -ti tcp:3000 2>/dev/null; lsof -ti tcp:8080 2>/dev/null) | sort -u); \
@@ -60,3 +62,5 @@ teardown:
 	@$(MAKE) -C backend teardown
 	@$(MAKE) -C frontend teardown-helper
 	@echo "Root teardown complete."
+
+teardown: down

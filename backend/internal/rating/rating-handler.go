@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/khorzhenwin/go-cafe/backend/internal/auth"
@@ -34,6 +35,9 @@ func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Han
 		r.Use(authMiddleware)
 		r.Get("/", h.ListByUserHandler)
 	})
+	r.Route("/community/places", func(r chi.Router) {
+		r.Get("/{placeId}/ratings", h.ListByExternalPlaceHandler)
+	})
 	r.Route("/ratings", func(r chi.Router) {
 		r.Get("/{id}", h.GetByIDHandler)
 		r.Group(func(r chi.Router) {
@@ -42,6 +46,33 @@ func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Han
 			r.Delete("/{id}", h.DeleteHandler)
 		})
 	})
+}
+
+// ListByExternalPlaceHandler godoc
+// @Summary List ratings by external place ID
+// @Description Returns ratings associated with an external discovery place.
+// @Tags ratings
+// @Produce json
+// @Param placeId path string true "External place ID"
+// @Success 200 {array} models.Rating
+// @Failure 400 {string} string
+// @Failure 500 {string} string
+// @Router /community/places/{placeId}/ratings [get]
+func (h *Handler) ListByExternalPlaceHandler(w http.ResponseWriter, r *http.Request) {
+	placeID := strings.TrimSpace(chi.URLParam(r, "placeId"))
+	if placeID == "" {
+		http.Error(w, "Invalid place ID", http.StatusBadRequest)
+		return
+	}
+
+	ratings, err := h.Service.GetByExternalPlaceID(placeID)
+	if err != nil {
+		http.Error(w, "Failed to retrieve ratings", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(ratings)
 }
 
 // GetByIDHandler godoc
@@ -200,8 +231,12 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	rating.CafeListingID = uint(cafeID)
 	rating.UserID = userID
 	if err := h.Service.CreateRating(&rating); err != nil {
-		if errors.Is(err, ErrCafeNotVisited) {
+		if errors.Is(err, ErrCafeNotVisited) || errors.Is(err, ErrInvalidRatingValue) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, ErrDuplicateRating) {
+			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -251,6 +286,10 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if err := h.Service.UpdateRating(uint(id), userID, rating); err != nil {
 		if errors.Is(err, ErrNotOwner) {
 			http.Error(w, "Forbidden", http.StatusForbidden)
+			return
+		}
+		if errors.Is(err, ErrInvalidRatingValue) {
+			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
 		if errors.Is(err, gorm.ErrRecordNotFound) {

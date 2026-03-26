@@ -21,11 +21,11 @@ func (m *mockCafeLookup) IsListingVisited(id uint) (bool, error) {
 }
 
 type mockRatingStorage struct {
-	ratings    []models.Rating
-	getByID    *models.Rating
-	createErr  error
-	updateErr  error
-	deleteErr  error
+	ratings   []models.Rating
+	getByID   *models.Rating
+	createErr error
+	updateErr error
+	deleteErr error
 }
 
 func (m *mockRatingStorage) Create(r *models.Rating) error {
@@ -59,6 +59,20 @@ func (m *mockRatingStorage) GetByUserID(id uint) ([]models.Rating, error) {
 	return out, nil
 }
 
+func (m *mockRatingStorage) GetByExternalPlaceID(externalPlaceID string) ([]models.Rating, error) {
+	return []models.Rating{}, nil
+}
+
+func (m *mockRatingStorage) FindByUserAndCafe(userID uint, cafeListingID uint) (*models.Rating, error) {
+	for _, rating := range m.ratings {
+		if rating.UserID == userID && rating.CafeListingID == cafeListingID {
+			copy := rating
+			return &copy, nil
+		}
+	}
+	return nil, nil
+}
+
 func (m *mockRatingStorage) Update(id uint, updated models.Rating) error { return m.updateErr }
 
 func (m *mockRatingStorage) Delete(id uint) error { return m.deleteErr }
@@ -80,6 +94,24 @@ func TestService_CreateRating_RequiresVisitedCafe(t *testing.T) {
 	err := svc.CreateRating(r)
 	assert.ErrorIs(t, err, ErrCafeNotVisited)
 	require.Len(t, m.ratings, 0)
+}
+
+func TestService_CreateRating_Duplicate(t *testing.T) {
+	m := &mockRatingStorage{
+		ratings: []models.Rating{{ID: 1, UserID: 1, CafeListingID: 2, Rating: 4}},
+	}
+	svc := NewService(m, &mockCafeLookup{visited: true})
+	r := &models.Rating{UserID: 1, CafeListingID: 2, Rating: 5}
+	err := svc.CreateRating(r)
+	assert.ErrorIs(t, err, ErrDuplicateRating)
+}
+
+func TestService_CreateRating_InvalidValue(t *testing.T) {
+	m := &mockRatingStorage{}
+	svc := NewService(m, &mockCafeLookup{visited: true})
+	r := &models.Rating{UserID: 1, CafeListingID: 2, Rating: 6}
+	err := svc.CreateRating(r)
+	assert.ErrorIs(t, err, ErrInvalidRatingValue)
 }
 
 func TestService_UpdateRating_NotOwner(t *testing.T) {

@@ -23,17 +23,96 @@ definitions:
       token:
         type: string
     type: object
+  cafelisting.AddressAutocompleteResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/cafelisting.AddressSuggestion'
+        type: array
+    type: object
+  cafelisting.AddressSuggestion:
+    properties:
+      address_line1:
+        type: string
+      address_line2:
+        type: string
+      city:
+        type: string
+      country:
+        type: string
+      formatted:
+        type: string
+      lat:
+        type: number
+      lon:
+        type: number
+      name:
+        type: string
+      postcode:
+        type: string
+    type: object
+  discovery.Place:
+    properties:
+      address:
+        type: string
+      avg_rating:
+        type: number
+      city:
+        type: string
+      description:
+        type: string
+      external_place_id:
+        type: string
+      id:
+        type: string
+      image_url:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        type: string
+      neighborhood:
+        type: string
+      review_count:
+        type: integer
+      source_provider:
+        type: string
+      visit_status:
+        type: string
+    type: object
   models.CafeListing:
     properties:
       address:
+        type: string
+      avg_rating:
+        type: number
+      city:
         type: string
       created_at:
         type: string
       description:
         type: string
+      external_place_id:
+        type: string
       id:
         type: integer
+      image_url:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
       name:
+        type: string
+      neighborhood:
+        type: string
+      review_count:
+        type: integer
+      source_cafe_id:
+        type: integer
+      source_provider:
         type: string
       updated_at:
         type: string
@@ -160,6 +239,46 @@ paths:
       summary: Register user
       tags:
       - auth
+  /cafes:
+    get:
+      description: Returns public community-submitted cafes for discovery surfaces.
+      parameters:
+      - description: Search query
+        in: query
+        name: query
+        type: string
+      - description: City filter
+        in: query
+        name: city
+        type: string
+      - description: 'Sort: rating_desc|newest|name_asc'
+        in: query
+        name: sort
+        type: string
+      - description: Result limit (1-60)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.CafeListing'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: Discover cafes
+      tags:
+      - cafes
   /cafes/{id}:
     delete:
       description: Deletes a cafe listing by ID.
@@ -352,6 +471,180 @@ paths:
       summary: Create rating
       tags:
       - ratings
+  /cafes/autocomplete:
+    get:
+      description: Returns autocomplete suggestions from Geoapify.
+      parameters:
+      - description: Partial address or place text
+        in: query
+        name: text
+        required: true
+        type: string
+      - description: Max suggestions (1-10)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/cafelisting.AddressAutocompleteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable
+          schema:
+            type: string
+      summary: Address autocomplete
+      tags:
+      - cafes
+  /community/places/{placeId}/ratings:
+    get:
+      description: Returns ratings associated with an external discovery place.
+      parameters:
+      - description: External place ID
+        in: path
+        name: placeId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Rating'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+      summary: List ratings by external place ID
+      tags:
+      - ratings
+  /discovery/cafes/:
+    get:
+      description: Returns discovery cafes sourced from Geoapify Places instead of
+        the shared application database.
+      parameters:
+      - description: Search query
+        in: query
+        name: query
+        type: string
+      - description: City filter
+        in: query
+        name: city
+        type: string
+      - description: Result limit
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/discovery.Place'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable
+          schema:
+            type: string
+      summary: Discover cafes from Geoapify Places
+      tags:
+      - discovery
+  /discovery/cafes/{placeId}:
+    get:
+      description: Returns a Geoapify cafe detail payload by place ID.
+      parameters:
+      - description: External place ID
+        in: path
+        name: placeId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/discovery.Place'
+        "404":
+          description: Not Found
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable
+          schema:
+            type: string
+      summary: Get discovery cafe by external place ID
+      tags:
+      - discovery
+  /discovery/cafes/static-map:
+    get:
+      description: Returns a Geoapify Static Maps image for discovery coordinates
+        without exposing the API key to the browser.
+      parameters:
+      - collectionFormat: csv
+        description: Map points in lat,lon format
+        in: query
+        items:
+          type: string
+        name: point
+        type: array
+      - description: Selected point in lat,lon format
+        in: query
+        name: selected
+        type: string
+      - description: Image width
+        in: query
+        name: width
+        type: integer
+      - description: Image height
+        in: query
+        name: height
+        type: integer
+      produces:
+      - image/png
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            type: string
+        "502":
+          description: Bad Gateway
+          schema:
+            type: string
+        "503":
+          description: Service Unavailable
+          schema:
+            type: string
+      summary: Get Geoapify static map image
+      tags:
+      - discovery
   /me/cafes:
     get:
       description: Returns cafe listings owned by the authenticated user.
