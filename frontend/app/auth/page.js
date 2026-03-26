@@ -25,8 +25,8 @@ export default function AuthPage() {
           <p className="eyebrow">What unlocks after sign in</p>
           <h2>Personal ownership without hiding discovery</h2>
           <p className="body-copy">
-            Public submissions stay browsable for everyone. Signing in lets you save cafes into your own list, mark them
-            visited, and add personal tasting notes.
+            Geoapify-sourced discovery stays browsable for everyone. Signing in lets you save cafes into your own list, mark
+            them visited, and add personal tasting notes.
           </p>
           <div className="cluster-sm">
             <Link href="/map" className="button">

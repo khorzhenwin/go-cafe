@@ -34,19 +34,3 @@ export function getCafeSummary(cafe) {
 export function hasCoordinates(cafe) {
   return typeof cafe?.latitude === "number" && typeof cafe?.longitude === "number";
 }
-
-export function buildGoogleMapsEmbedUrl(cafe) {
-  if (hasCoordinates(cafe)) {
-    return `https://www.google.com/maps?q=${encodeURIComponent(`${cafe.latitude},${cafe.longitude}`)}&z=15&output=embed`;
-  }
-
-  if (cafe?.google_maps_url) {
-    return `${cafe.google_maps_url}&output=embed`;
-  }
-
-  if (cafe?.address || cafe?.name) {
-    return `https://www.google.com/maps?q=${encodeURIComponent(cafe.address || cafe.name)}&output=embed`;
-  }
-
-  return "";
-}

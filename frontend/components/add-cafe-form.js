@@ -18,6 +18,7 @@ export default function AddCafeForm({ onCreate, submitting }) {
   const [longitude, setLongitude] = useState(null);
   const [suggestions, setSuggestions] = useState([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [autocompleteError, setAutocompleteError] = useState("");
 
   useEffect(() => {
     const query = address.trim();
@@ -25,21 +26,25 @@ export default function AddCafeForm({ onCreate, submitting }) {
     if (query.length < 3) {
       setSuggestions([]);
       setLoadingSuggestions(false);
+      setAutocompleteError("");
       return undefined;
     }
 
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setLoadingSuggestions(true);
+      setAutocompleteError("");
 
       try {
-        const payload = await searchCafeAddresses(query, 5);
+        const locationHint = city.trim() || "Singapore";
+        const payload = await searchCafeAddresses(`${query}, ${locationHint}`, 5);
         if (!cancelled) {
           setSuggestions(payload?.results || []);
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
           setSuggestions([]);
+          setAutocompleteError(error.message || "Address lookup failed.");
         }
       } finally {
         if (!cancelled) {
@@ -52,7 +57,7 @@ export default function AddCafeForm({ onCreate, submitting }) {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [address]);
+  }, [address, city]);
 
   function applySuggestion(suggestion) {
     const selectedAddress = suggestion.formatted || suggestion.address_line1 || suggestion.name || "";
@@ -68,6 +73,14 @@ export default function AddCafeForm({ onCreate, submitting }) {
     }
 
     setSuggestions([]);
+    setAutocompleteError("");
+  }
+
+  function handleAddressChange(event) {
+    setAddress(event.target.value);
+    setLatitude(null);
+    setLongitude(null);
+    setAutocompleteError("");
   }
 
   async function handleSubmit(event) {
@@ -102,7 +115,7 @@ export default function AddCafeForm({ onCreate, submitting }) {
   }
 
   return (
-    <section className="surface">
+    <section className="surface section-panel form-panel">
       <div className="cluster">
         <p className="eyebrow">Add a new cafe</p>
         <h2>Add a place to your personal journal</h2>
@@ -116,8 +129,9 @@ export default function AddCafeForm({ onCreate, submitting }) {
 
         <label>
           Address
-          <input value={address} onChange={(event) => setAddress(event.target.value)} />
+          <input value={address} onChange={handleAddressChange} />
           {loadingSuggestions ? <small className="muted">Searching addresses...</small> : null}
+          {autocompleteError ? <small className="form-hint error">{autocompleteError}</small> : null}
           {suggestions.length ? (
             <div className="suggestion-list">
               {suggestions.map((suggestion, index) => (

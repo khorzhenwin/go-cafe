@@ -50,7 +50,7 @@ func RegisterRoutes(r chi.Router, service *Service, authMiddleware func(http.Han
 
 // ListByExternalPlaceHandler godoc
 // @Summary List ratings by external place ID
-// @Description Returns ratings associated with a Google discovery place.
+// @Description Returns ratings associated with an external discovery place.
 // @Tags ratings
 // @Produce json
 // @Param placeId path string true "External place ID"

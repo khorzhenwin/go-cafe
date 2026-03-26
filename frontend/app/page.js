@@ -9,7 +9,7 @@ import { useAuth } from "@/components/providers/auth-provider";
 import { listDiscoveryCafes } from "@/lib/api";
 
 const BENEFITS = [
-  "Browse real cafes from Google instead of relying on seeded shared database content.",
+  "Browse real cafes from Geoapify instead of relying on seeded shared database content.",
   "Save interesting places into a personal shortlist for later visits.",
   "Turn visits into reviews without losing the discovery context."
 ];
@@ -54,7 +54,7 @@ export default function HomePage() {
 
   const stats = useMemo(
     () => [
-      { label: "Community spots", value: cafes.length },
+      { label: "Discovery spots", value: cafes.length },
       { label: "Mapped entries", value: cafes.filter((cafe) => cafe.latitude && cafe.longitude).length },
       { label: "Total reviews", value: cafes.reduce((sum, cafe) => sum + (cafe.review_count || 0), 0) }
     ],
@@ -64,7 +64,7 @@ export default function HomePage() {
   return (
     <AppShell
       title="Discover cafes with better context"
-      subtitle="Cafe Hub now leads with discovery: browse Google-sourced cafes, understand the vibe quickly, then save the ones worth adding to your own ritual."
+      subtitle="Cafe Hub now leads with discovery: browse Geoapify-sourced cafes, understand the vibe quickly, then save the ones worth adding to your own ritual."
       actions={
         <>
           <Link href="/map" className="button">
@@ -122,7 +122,7 @@ export default function HomePage() {
           {selectedCafe ? (
             <>
               <h2>{selectedCafe.name}</h2>
-              <p className="muted">{selectedCafe.address || selectedCafe.city || "Google Places result"}</p>
+              <p className="muted">{selectedCafe.address || selectedCafe.city || "Geoapify discovery result"}</p>
               <p className="body-copy">
                 {selectedCafe.description || "Open this cafe detail to see the full context and community notes."}
               </p>
@@ -138,7 +138,7 @@ export default function HomePage() {
           ) : loading ? (
             <p>Loading featured cafes...</p>
           ) : (
-            <p>No public cafes yet. Add one from your personal area to populate the map.</p>
+            <p>No discovery cafes are available right now. Try again after Geoapify returns results for the selected city.</p>
           )}
           {error ? <p className="feedback error">{error}</p> : null}
         </div>
@@ -159,7 +159,7 @@ export default function HomePage() {
 
         {!loading && !cafes.length ? (
           <section className="surface empty-state">
-            Google discovery is not available right now. Set the Google Places API key to populate this view with live cafes.
+            Geoapify discovery is not available right now. Check the configured Geoapify key to populate this view with live cafes.
           </section>
         ) : null}
 

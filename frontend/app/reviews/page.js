@@ -103,7 +103,7 @@ export default function ReviewsPage() {
     >
       <RequireAuth>
         <section className="content-grid">
-          <section className="surface">
+          <section className="surface section-panel form-panel">
             <div className="cluster">
               <p className="eyebrow">Write a review</p>
               <h2>Capture the visit while it is fresh</h2>
@@ -154,7 +154,7 @@ export default function ReviewsPage() {
             ) : null}
           </section>
 
-          <section className="surface spotlight-card">
+          <section className="surface spotlight-card note-panel">
             <p className="eyebrow">Review cadence</p>
             <h2>Separate writing from discovery</h2>
             <p className="body-copy">

@@ -1,9 +1,32 @@
 # go-cafe
 
-![go-cafe journey UI preview](docs/images/journey-ui-preview.png)
+![go-cafe redesign landing preview](docs/images/redesign-landing-overview.png)
 
 `go-cafe` is a cafe discovery and rating project with a Go backend and a frontend app.
 This README is the live source of truth for architecture, database requirements, and backend/frontend contracts.
+The current product experience is organized around discovery-first browsing, personal place management, and post-visit tasting notes.
+
+## Product screenshots
+
+Landing and featured discovery on `/`:
+
+![go-cafe landing redesign](docs/images/redesign-landing-overview.png)
+
+Map-first search flow on `/map`:
+
+![go-cafe map redesign](docs/images/redesign-map-discovery.png)
+
+Personal collection management on `/my-places`:
+
+![go-cafe my places overview](docs/images/redesign-my-places-overview.png)
+
+Saved and visited state management within `/my-places`:
+
+![go-cafe my places status workflow](docs/images/redesign-my-places-statuses.png)
+
+Dedicated review writing and history on `/reviews`:
+
+![go-cafe reviews redesign](docs/images/redesign-reviews.png)
 
 ## Living document protocol
 
@@ -64,6 +87,7 @@ Flow:
   - Personal saved/visited collection at `/my-places`
   - Review writing/history at `/reviews`
   - Dedicated auth screen at `/auth`
+  - Public discovery now reads from Geoapify Places instead of shared database-seeded cafes
 - API client location: `frontend/lib/api/` with a compatibility export at `frontend/lib/api.js`
 - Proxy route to backend API: `frontend/app/api/backend/[...path]/route.js`
 - Validation config:
@@ -113,6 +137,9 @@ Public:
 - `GET /api/v1/cafes` (supports query: `query`, `city`, `sort`, `limit`)
 - `GET /api/v1/cafes/{id}`
 - `GET /api/v1/cafes/autocomplete`
+- `GET /api/v1/discovery/cafes/` (Geoapify Places-backed discovery results)
+- `GET /api/v1/discovery/cafes/static-map` (Geoapify Static Maps image proxy for discovery screens)
+- `GET /api/v1/discovery/cafes/{placeId}` (Geoapify Places-backed detail)
 
 Protected:
 
@@ -133,6 +160,7 @@ Cafe status rules:
 - Rating create returns `400` with message `cafe must be marked visited before rating` when status is `to_visit`.
 - `POST /api/v1/me/cafes` accepts discovery metadata fields: `city`, `neighborhood`, `image_url`, `latitude`, `longitude`.
 - `POST /api/v1/me/cafes` can accept `source_cafe_id` when saving a public discovery into a personal collection.
+- `POST /api/v1/me/cafes` can accept `source_provider` and `external_place_id` when saving a Geoapify discovery result.
 - Public discovery responses include derived `avg_rating` and `review_count`.
 
 Cafe sort options (`sort` query):
@@ -144,17 +172,25 @@ Cafe sort options (`sort` query):
 - `status_asc`
 - `status_desc`
 
-Public discovery sort options (`GET /api/v1/cafes`):
+Geoapify discovery options (`GET /api/v1/discovery/cafes/`):
 
-- `rating_desc` (default)
-- `newest`
-- `name_asc`
+- `query` (free-text place-name search within the discovery area)
+- `city`
+- `limit`
+
+Geoapify static map options (`GET /api/v1/discovery/cafes/static-map`):
+
+- `point` (repeatable `lat,lon` query values for visible cafes)
+- `selected` (`lat,lon` for highlighted cafe marker)
+- `width`
+- `height`
 
 ### Rating endpoints
 
 Public:
 
 - `GET /api/v1/cafes/{id}/ratings/`
+- `GET /api/v1/community/places/{placeId}/ratings`
 - `GET /api/v1/ratings/{id}`
 
 Protected:
@@ -171,6 +207,7 @@ Rating creation rule:
 - `POST /api/v1/cafes/{id}/ratings/` returns `400` if `rating` is outside `1-5`.
 - `POST /api/v1/cafes/{id}/ratings/` returns `409` when the same user already reviewed the same cafe.
 - `GET /api/v1/cafes/{id}/ratings/` returns community ratings for the root discovery cafe and any saved copies linked by `source_cafe_id`.
+- `GET /api/v1/community/places/{placeId}/ratings` returns reviews written against saved cafes linked to the same Geoapify place.
 
 ## Database requirements
 
@@ -190,6 +227,7 @@ Current schema (base tables from `000001_create_gocafe_tables.up.sql` plus later
   - `user_id` (FK -> `gocafe_users.id`, cascade delete)
   - `name` (required), `address`, `city`, `neighborhood`, `description`, `image_url`
   - `latitude`, `longitude`
+  - `source_provider`, `external_place_id`
   - `visit_status` (required; `to_visit` or `visited`; default `to_visit`)
   - `source_cafe_id` (nullable self-reference for personal saved copies of public discoveries)
 - `gocafe_ratings`
@@ -211,12 +249,17 @@ Additional migration:
   - Adds a self-referential FK for `source_cafe_id`
   - Adds index support for discovery filtering
   - Adds a rating range check (`1-5`)
+- `000005_add_external_place_source.up.sql`
+  - Adds `source_provider` and `external_place_id`
+  - Supports saving Geoapify discovery results into personal cafe records without persisting shared community seed cafes
 
 Indexes:
 
 - `gocafe_users.email`
 - `gocafe_cafe_listings.user_id`
 - `gocafe_cafe_listings.city`
+- `gocafe_cafe_listings.external_place_id`
+- `gocafe_cafe_listings.source_provider`
 - `gocafe_cafe_listings.source_cafe_id`
 - `gocafe_cafe_listings.visit_status`
 - `gocafe_ratings.user_id`
@@ -230,6 +273,7 @@ Indexes:
 - Password hash is never exposed in API JSON.
 - Discovery cards may include `avg_rating` and `review_count`.
 - Public discoveries are original cafes (`source_cafe_id == null`); personal saved copies may point back to the original via `source_cafe_id`.
+- Geoapify-sourced discovery results use string `placeId` values in the frontend detail route; saved personal cafes still use numeric DB IDs.
 
 ## Environment requirements
 
@@ -244,6 +288,7 @@ Backend reads env vars from `backend/.env` (via `godotenv`):
 - `DB_SSL_ROOT_CERT` (optional, defaults to `global-bundle.pem`)
 - `JWT_SECRET` (required)
 - `JWT_EXPIRY` (optional, defaults to `24h`)
+- `GEOAPIFY_API_KEY` (required for live public discovery from Geoapify Places and address autocomplete)
 
 Reference template: `backend/.env.example`
 
@@ -254,6 +299,7 @@ Frontend env vars (`frontend/.env`):
   - Production backend: `https://<your-backend-domain>`
 - `NEXT_PUBLIC_API_BASE_URL` (fallback if `API_BASE_URL` is not set)
 - If both are unset, frontend proxy defaults to `http://localhost:8080`.
+- The frontend also exposes an internal image proxy at `/api/static-map` so the browser can render Geoapify static maps without receiving the API key directly.
 
 Vercel setup:
 
@@ -281,6 +327,7 @@ Notes:
 
 - `make run` / `make up` now starts the backend through `make -C backend run`, which applies pending backend migrations before booting the API.
 - `make teardown` / `make down` stops the local frontend/backend processes and removes generated artifacts.
+- Without `GEOAPIFY_API_KEY`, discovery endpoints fail closed with `503` and the frontend shows a clear empty/error state instead of reading shared seeded cafes from the application database.
 
 Common backend targets:
 
@@ -314,7 +361,7 @@ Core persistence checks (POST -> GET, PUT -> GET, DELETE -> GET):
 
 - Auth: register + login return JWT.
 - Users: protected CRUD routes require JWT.
-- Cafes: public discovery list under `/cafes`, create under `/me/cafes`, list under `/me/cafes`, get by id, update/delete owner-only.
+- Cafes: Geoapify discovery list under `/discovery/cafes/`, create under `/me/cafes`, list under `/me/cafes`, get by id, update/delete owner-only.
 - Ratings: create under `/cafes/{id}/ratings/`, list by cafe, get by id, update/delete owner-only.
 - User-scoped legacy routes: `/users/{userId}/cafes/` and `/users/{userId}/ratings/`.
 
@@ -343,7 +390,7 @@ curl -s http://localhost:8080/api/v1/me/cafes \
   -H "Authorization: Bearer $TOKEN"
 
 # public discovery
-curl -s "http://localhost:8080/api/v1/cafes?query=smoke&sort=rating_desc"
+curl -s "http://localhost:8080/api/v1/discovery/cafes/?query=smoke&city=singapore"
 ```
 
 ## Definition of done for requirement changes
@@ -367,3 +414,6 @@ For any PR that changes behavior across backend/frontend:
 - `2026-03-26`: Repositioned the product around discovery-first browsing with dedicated landing, map, auth, saved places, review, and cafe detail routes.
 - `2026-03-26`: Added public discovery APIs, discovery metadata fields on cafes, `source_cafe_id` support for saved copies, and rating guardrails.
 - `2026-03-26`: Updated local validation guidance to use ESLint in the frontend and auto-apply backend migrations during root `make run` startup.
+- `2026-03-26`: Switched public discovery away from shared database records to Geoapify Places-backed endpoints, added external place linkage on saved cafes, and cleaned up synthetic validation data from the shared database.
+- `2026-03-26`: Replaced the client-side interactive map with Geoapify Static Maps, restored address autocomplete by adding Singapore-aware lookup context, and tightened padding on the My Places and Reviews forms.
+- `2026-03-26`: Refreshed README screenshots to match the current discovery-first redesign across the landing, map, My Places, and Reviews flows.

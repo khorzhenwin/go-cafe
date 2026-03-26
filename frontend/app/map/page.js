@@ -126,7 +126,7 @@ export default function MapPage() {
   return (
     <AppShell
       title="Map-first cafe discovery"
-      subtitle="Search real cafe results from Google by name, neighborhood, or city. Save the ones worth revisiting into your own private journal."
+      subtitle="Search real cafe results from Geoapify by name and city, then save the ones worth revisiting into your own private journal."
       actions={
         <>
           <Link href="/my-places" className="button button-secondary">
@@ -167,7 +167,7 @@ export default function MapPage() {
           {selectedCafe ? (
             <>
               <h2>{selectedCafe.name}</h2>
-              <p className="muted">{selectedCafe.address || "Google discovery result"}</p>
+              <p className="muted">{selectedCafe.address || "Geoapify discovery result"}</p>
               <p className="body-copy">
                 {selectedCafe.description || "Open the detail page to understand the context behind this recommendation."}
               </p>
@@ -200,7 +200,7 @@ export default function MapPage() {
 
       {!loading && !cafes.length ? (
         <section className="surface empty-state">
-          No Google cafe results match your current filters. Try broadening the search or check that the Google Places API key is configured.
+          No Geoapify cafe results match your current filters. Try broadening the search or check that the Geoapify key is configured.
         </section>
       ) : null}
 

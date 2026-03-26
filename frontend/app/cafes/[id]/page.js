@@ -217,7 +217,7 @@ export default function CafeDetailPage() {
           </section>
 
           <section className="content-grid">
-            <CafeMap cafes={[cafe]} selectedCafeId={cafe.id} title="Cafe location" />
+            <CafeMap cafes={[cafe]} selectedCafeId={cafe.external_place_id || cafe.id} title="Cafe location" />
 
             <div className="surface spotlight-card">
               <p className="eyebrow">Next action</p>

@@ -522,6 +522,214 @@ const docTemplate = `{
                 }
             }
         },
+        "/community/places/{placeId}/ratings": {
+            "get": {
+                "description": "Returns ratings associated with an external discovery place.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "ratings"
+                ],
+                "summary": "List ratings by external place ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "External place ID",
+                        "name": "placeId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/models.Rating"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/discovery/cafes/": {
+            "get": {
+                "description": "Returns discovery cafes sourced from Geoapify Places instead of the shared application database.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "discovery"
+                ],
+                "summary": "Discover cafes from Geoapify Places",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Search query",
+                        "name": "query",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "City filter",
+                        "name": "city",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Result limit",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/discovery.Place"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/discovery/cafes/static-map": {
+            "get": {
+                "description": "Returns a Geoapify Static Maps image for discovery coordinates without exposing the API key to the browser.",
+                "produces": [
+                    "image/png"
+                ],
+                "tags": [
+                    "discovery"
+                ],
+                "summary": "Get Geoapify static map image",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "Map points in lat,lon format",
+                        "name": "point",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Selected point in lat,lon format",
+                        "name": "selected",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Image width",
+                        "name": "width",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Image height",
+                        "name": "height",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/discovery/cafes/{placeId}": {
+            "get": {
+                "description": "Returns a Geoapify cafe detail payload by place ID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "discovery"
+                ],
+                "summary": "Get discovery cafe by external place ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "External place ID",
+                        "name": "placeId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/discovery.Place"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/me/cafes": {
             "get": {
                 "security": [
@@ -1359,6 +1567,53 @@ const docTemplate = `{
                 }
             }
         },
+        "discovery.Place": {
+            "type": "object",
+            "properties": {
+                "address": {
+                    "type": "string"
+                },
+                "avg_rating": {
+                    "type": "number"
+                },
+                "city": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "external_place_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "neighborhood": {
+                    "type": "string"
+                },
+                "review_count": {
+                    "type": "integer"
+                },
+                "source_provider": {
+                    "type": "string"
+                },
+                "visit_status": {
+                    "type": "string"
+                }
+            }
+        },
         "models.CafeListing": {
             "type": "object",
             "properties": {
@@ -1375,6 +1630,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "description": {
+                    "type": "string"
+                },
+                "external_place_id": {
                     "type": "string"
                 },
                 "id": {
@@ -1400,6 +1658,9 @@ const docTemplate = `{
                 },
                 "source_cafe_id": {
                     "type": "integer"
+                },
+                "source_provider": {
+                    "type": "string"
                 },
                 "updated_at": {
                     "type": "string"

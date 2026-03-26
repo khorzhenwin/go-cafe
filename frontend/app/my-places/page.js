@@ -148,7 +148,7 @@ export default function MyPlacesPage() {
         <section className="content-grid">
           <AddCafeForm onCreate={handleCreateCafe} submitting={submitting} />
 
-          <section className="surface spotlight-card">
+          <section className="surface spotlight-card note-panel">
             <p className="eyebrow">Collection notes</p>
             <h2>What belongs here?</h2>
             <p className="body-copy">
