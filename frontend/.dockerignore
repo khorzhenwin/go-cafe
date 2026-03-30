@@ -1,6 +1,11 @@
-node_modules
+.git
 .next
+node_modules
 npm-debug.log*
 .env
 .env.*
-.git
+!.env.example
+!.env.exmaple
+Dockerfile
+docker-compose.yml
+k8s

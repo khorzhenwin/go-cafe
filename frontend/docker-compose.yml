@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   go-cafe-frontend:
     build:
@@ -5,12 +7,8 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3000:3000"
-    env_file:
-      - .env
     environment:
-      NODE_ENV: production
-      HOSTNAME: 0.0.0.0
-      PORT: 3000
+      API_BASE_URL: http://host.docker.internal:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
